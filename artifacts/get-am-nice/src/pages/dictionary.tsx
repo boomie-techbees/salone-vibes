@@ -320,7 +320,21 @@ function LexiconEntryCard({ entry }: { entry: LexiconEntry }) {
         <div>
           <p className="text-foreground leading-relaxed">{entry.definition}</p>
         </div>
-        
+
+        {entry.usageExamples && entry.usageExamples.length > 0 && (
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Usage Examples</h4>
+            <ul className="space-y-2">
+              {entry.usageExamples.map((example: string, i: number) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-foreground/90 leading-relaxed">
+                  <ChevronRight className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                  <span>{example}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {entry.notes && (
           <div className="mt-auto pt-4 border-t border-border/50">
             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">My Notes</h4>
@@ -335,6 +349,7 @@ function LexiconEntryCard({ entry }: { entry: LexiconEntry }) {
 const editEntrySchema = z.object({
   definition: z.string().min(1, "Definition required"),
   culturalContext: z.string().min(1, "Context required"),
+  usageExamplesText: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -349,13 +364,18 @@ function EditLexiconEntryDialog({ entry }: { entry: LexiconEntry }) {
     defaultValues: {
       definition: entry.definition || "",
       culturalContext: entry.culturalContext || "",
+      usageExamplesText: (entry.usageExamples ?? []).join("\n"),
       notes: entry.notes || "",
     },
   });
 
   const onSubmit = (data: z.infer<typeof editEntrySchema>) => {
+    const usageExamples = (data.usageExamplesText ?? "")
+      .split("\n")
+      .map(s => s.trim())
+      .filter(Boolean);
     updateMutation.mutate(
-      { id: entry.id, data },
+      { id: entry.id, data: { ...data, usageExamples } },
       {
         onSuccess: () => {
           toast({ title: "Entry updated successfully" });
@@ -432,6 +452,25 @@ function EditLexiconEntryDialog({ entry }: { entry: LexiconEntry }) {
                   <FormControl>
                     <Textarea className="resize-none h-24" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="usageExamplesText"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Usage Examples</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder={"One example per line, e.g.:\nKusheh, how di body? (Hello, how are you?)\nKusheh-o! (A more emphatic greeting)"}
+                      className="resize-none h-28 text-sm"
+                      {...field}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">One example per line</p>
                   <FormMessage />
                 </FormItem>
               )}
