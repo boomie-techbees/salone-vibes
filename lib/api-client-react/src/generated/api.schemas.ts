@@ -95,6 +95,28 @@ export interface SubmitEventBody {
   submittedBy?: string | null;
 }
 
+export interface Song {
+  id: number;
+  userId: number;
+  songTitle: string;
+  artistName: string;
+  note?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSongBody {
+  songTitle: string;
+  artistName: string;
+  note?: string | null;
+}
+
+export interface UpdateSongBody {
+  songTitle?: string;
+  artistName?: string;
+  note?: string | null;
+}
+
 export type ListEventsParams = {
   /**
    * Filter events by city or country

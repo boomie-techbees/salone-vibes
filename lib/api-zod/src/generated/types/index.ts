@@ -7,13 +7,16 @@
  */
 
 export * from "./createLexiconEntryBody";
+export * from "./createSongBody";
 export * from "./dictionaryEntry";
 export * from "./dictionaryLookupBody";
 export * from "./event";
 export * from "./healthStatus";
 export * from "./lexiconEntry";
 export * from "./listEventsParams";
+export * from "./song";
 export * from "./submitEventBody";
 export * from "./updateLexiconEntryBody";
 export * from "./updateProfileBody";
+export * from "./updateSongBody";
 export * from "./userProfile";

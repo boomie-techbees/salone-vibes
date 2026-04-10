@@ -196,3 +196,56 @@ export const GetUpcomingEventsPreviewResponseItem = zod.object({
 export const GetUpcomingEventsPreviewResponse = zod.array(
   GetUpcomingEventsPreviewResponseItem,
 );
+
+/**
+ * @summary List the current user's saved songs
+ */
+export const ListSongsResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  songTitle: zod.string(),
+  artistName: zod.string(),
+  note: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListSongsResponse = zod.array(ListSongsResponseItem);
+
+/**
+ * @summary Add a song to the user's personal playlist
+ */
+export const CreateSongBody = zod.object({
+  songTitle: zod.string(),
+  artistName: zod.string(),
+  note: zod.string().nullish(),
+});
+
+/**
+ * @summary Update a saved song
+ */
+export const UpdateSongParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateSongBody = zod.object({
+  songTitle: zod.string().optional(),
+  artistName: zod.string().optional(),
+  note: zod.string().nullish(),
+});
+
+export const UpdateSongResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  songTitle: zod.string(),
+  artistName: zod.string(),
+  note: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Remove a song from the user's playlist
+ */
+export const DeleteSongParams = zod.object({
+  id: zod.coerce.number(),
+});
