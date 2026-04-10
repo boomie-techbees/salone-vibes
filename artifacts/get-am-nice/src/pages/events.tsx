@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Show, useAuth } from "@clerk/react";
-import { Link } from "wouter";
 import { format } from "date-fns";
 import { MapPin, Calendar as CalendarIcon, Ticket, Plus, Check } from "lucide-react";
 
@@ -134,7 +132,6 @@ export function Events() {
 function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-  const { isSignedIn } = useAuth();
   const submitMutation = useSubmitEvent();
 
   const form = useForm<SubmitEventValues>({
@@ -190,22 +187,7 @@ function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
           </DialogDescription>
         </DialogHeader>
 
-        <Show when="signed-out">
-          <div className="bg-muted p-6 rounded-lg text-center my-4 border border-border">
-            <p className="mb-4">You need to be signed in to submit events.</p>
-            <div className="flex justify-center gap-4">
-              <Link href="/sign-in">
-                <Button variant="outline">Log in</Button>
-              </Link>
-              <Link href="/sign-up">
-                <Button>Sign up</Button>
-              </Link>
-            </div>
-          </div>
-        </Show>
-
-        <Show when="signed-in">
-          <Form {...form}>
+        <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
               <FormField
                 control={form.control}
@@ -341,7 +323,6 @@ function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
               </div>
             </form>
           </Form>
-        </Show>
       </DialogContent>
     </Dialog>
   );
