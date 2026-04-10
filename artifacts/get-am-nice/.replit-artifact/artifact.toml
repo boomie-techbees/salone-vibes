@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Get Am Nice"
+version = "1.0.0"
+id = "artifacts/get-am-nice"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21619
+
+[services.development]
+run = "pnpm --filter @workspace/get-am-nice run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/get-am-nice", "run", "build" ]
+publicDir = "artifacts/get-am-nice/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21619"
+BASE_PATH = "/"

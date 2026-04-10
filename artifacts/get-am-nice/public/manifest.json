@@ -1,0 +1,16 @@
+{
+  "name": "Get Am Nice",
+  "short_name": "GetAmNice",
+  "description": "Salone cultural companion app",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#007847",
+  "theme_color": "#007847",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -3,13 +3,19 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Get Am Nice API — Salone cultural companion app
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: profile
+    description: User profile operations
+  - name: dictionary
+    description: Dictionary lookup and saved lexicon
+  - name: events
+    description: Salone music events
 paths:
   /healthz:
     get:
@@ -24,7 +30,230 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: Get current user profile
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+    put:
+      operationId: updateProfile
+      tags: [profile]
+      summary: Update user profile display name
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+
+  /dictionary/lookup:
+    post:
+      operationId: dictionaryLookup
+      tags: [dictionary]
+      summary: Look up a Krio or Salone word/phrase using Claude AI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DictionaryLookupBody"
+      responses:
+        "200":
+          description: Dictionary entry with cultural context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DictionaryEntry"
+        "400":
+          description: Bad request
+
+  /dictionary/term-of-the-day:
+    get:
+      operationId: getTermOfTheDay
+      tags: [dictionary]
+      summary: Get today's featured Salone term
+      responses:
+        "200":
+          description: Today's term
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DictionaryEntry"
+
+  /dictionary/lexicon:
+    get:
+      operationId: listLexicon
+      tags: [dictionary]
+      summary: List saved lexicon entries for the authenticated user
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: List of saved entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LexiconEntry"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createLexiconEntry
+      tags: [dictionary]
+      summary: Save a new entry to the user's personal lexicon
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLexiconEntryBody"
+      responses:
+        "201":
+          description: Saved entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LexiconEntry"
+        "401":
+          description: Unauthorized
+
+  /dictionary/lexicon/{id}:
+    put:
+      operationId: updateLexiconEntry
+      tags: [dictionary]
+      summary: Edit a saved lexicon entry (e.g. to correct AI errors)
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLexiconEntryBody"
+      responses:
+        "200":
+          description: Updated entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LexiconEntry"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteLexiconEntry
+      tags: [dictionary]
+      summary: Remove an entry from the user's lexicon
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: List upcoming Salone music events, optionally filtered by location
+      parameters:
+        - name: location
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter events by city or country
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+    post:
+      operationId: submitEvent
+      tags: [events]
+      summary: Submit a new event for listing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitEventBody"
+      responses:
+        "201":
+          description: Event submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "400":
+          description: Bad request
+
+  /events/upcoming-preview:
+    get:
+      operationId: getUpcomingEventsPreview
+      tags: [events]
+      summary: Get a short preview of the next 3 upcoming events (for the home screen)
+      responses:
+        "200":
+          description: Preview of upcoming events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+
 components:
+  securitySchemes:
+    clerkAuth:
+      type: http
+      scheme: bearer
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +263,230 @@ components:
       required:
         - status
 
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        clerkUserId:
+          type: string
+        displayName:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - clerkUserId
+        - createdAt
+
+    UpdateProfileBody:
+      type: object
+      properties:
+        displayName:
+          type: string
+      required:
+        - displayName
+
+    DictionaryLookupBody:
+      type: object
+      properties:
+        term:
+          type: string
+          description: The Krio or Salone word/phrase to look up
+      required:
+        - term
+
+    DictionaryEntry:
+      type: object
+      properties:
+        term:
+          type: string
+        definition:
+          type: string
+        culturalContext:
+          type: string
+        usageExamples:
+          type: array
+          items:
+            type: string
+        pronunciation:
+          type: string
+          nullable: true
+        partOfSpeech:
+          type: string
+          nullable: true
+      required:
+        - term
+        - definition
+        - culturalContext
+        - usageExamples
+
+    LexiconEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        term:
+          type: string
+        definition:
+          type: string
+        culturalContext:
+          type: string
+        usageExamples:
+          type: array
+          items:
+            type: string
+        pronunciation:
+          type: string
+          nullable: true
+        partOfSpeech:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+          description: User's own notes or corrections
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - term
+        - definition
+        - culturalContext
+        - usageExamples
+        - createdAt
+        - updatedAt
+
+    CreateLexiconEntryBody:
+      type: object
+      properties:
+        term:
+          type: string
+        definition:
+          type: string
+        culturalContext:
+          type: string
+        usageExamples:
+          type: array
+          items:
+            type: string
+        pronunciation:
+          type: string
+          nullable: true
+        partOfSpeech:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+      required:
+        - term
+        - definition
+        - culturalContext
+        - usageExamples
+
+    UpdateLexiconEntryBody:
+      type: object
+      properties:
+        definition:
+          type: string
+        culturalContext:
+          type: string
+        usageExamples:
+          type: array
+          items:
+            type: string
+        pronunciation:
+          type: string
+          nullable: true
+        partOfSpeech:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        location:
+          type: string
+        city:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        eventDate:
+          type: string
+          format: date-time
+        venue:
+          type: string
+          nullable: true
+        ticketUrl:
+          type: string
+          nullable: true
+        submittedBy:
+          type: string
+          nullable: true
+        approved:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - location
+        - eventDate
+        - approved
+        - createdAt
+
+    SubmitEventBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        location:
+          type: string
+        city:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        eventDate:
+          type: string
+          format: date-time
+        venue:
+          type: string
+          nullable: true
+        ticketUrl:
+          type: string
+          nullable: true
+        submittedBy:
+          type: string
+          nullable: true
+      required:
+        - title
+        - location
+        - eventDate
