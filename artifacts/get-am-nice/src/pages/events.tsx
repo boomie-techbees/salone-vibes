@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -36,7 +36,7 @@ export function Events() {
   const [debouncedFilter, setDebouncedFilter] = useState("");
 
   // Simple debounce for filter
-  useState(() => {
+  useEffect(() => {
     const timer = setTimeout(() => setDebouncedFilter(locationFilter), 500);
     return () => clearTimeout(timer);
   }, [locationFilter]);

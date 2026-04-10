@@ -13,7 +13,7 @@ import {
   useDeleteLexiconEntry,
   getListLexiconQueryKey
 } from "@workspace/api-client-react";
-import type { DictionaryEntry, LexiconEntry } from "@workspace/api-client-react/src/generated/api.schemas";
+import type { DictionaryEntry, LexiconEntry } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -243,7 +243,7 @@ function LookupTab({ onSaved }: { onSaved: () => void }) {
                   Usage Examples
                 </h3>
                 <ul className="space-y-3">
-                  {result.usageExamples.map((example, i) => (
+                  {result.usageExamples.map((example: string, i: number) => (
                     <li key={i} className="flex items-start gap-2 text-foreground/90 leading-relaxed">
                       <ChevronRight className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                       <span>{example}</span>
