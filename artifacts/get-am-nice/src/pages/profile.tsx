@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useAuth, useUser } from "@clerk/react";
+import { useAuth, useUser, Show, RedirectToSignIn } from "@clerk/react";
 import { Loader2, LogOut, Settings, User } from "lucide-react";
 import { format } from "date-fns";
 
@@ -173,5 +173,18 @@ export function Profile() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export function ProfilePage() {
+  return (
+    <>
+      <Show when="signed-in">
+        <Profile />
+      </Show>
+      <Show when="signed-out">
+        <RedirectToSignIn />
+      </Show>
+    </>
   );
 }

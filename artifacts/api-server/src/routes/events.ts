@@ -18,8 +18,8 @@ router.get("/events", async (req, res) => {
         upcomingFilter,
         or(
           ilike(eventsTable.location, `%${location}%`),
-          ilike(eventsTable.city ?? "", `%${location}%`),
-          ilike(eventsTable.country ?? "", `%${location}%`),
+          ilike(eventsTable.city, `%${location}%`),
+          ilike(eventsTable.country, `%${location}%`),
         ),
       )
     : upcomingFilter;

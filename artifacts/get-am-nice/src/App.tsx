@@ -12,7 +12,7 @@ import { SignInPage, SignUpPage } from "@/pages/auth";
 import { Artists } from "@/pages/artists";
 import { Dictionary } from "@/pages/dictionary";
 import { Events } from "@/pages/events";
-import { Profile } from "@/pages/profile";
+import { ProfilePage } from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -83,7 +83,7 @@ function ClerkProviderWithRoutes() {
               <Route path="/dictionary" component={Dictionary} />
               <Route path="/artists" component={Artists} />
               <Route path="/events" component={Events} />
-              <Route path="/profile" component={Profile} />
+              <Route path="/profile" component={ProfilePage} />
               <Route component={NotFound} />
             </Switch>
           </Layout>

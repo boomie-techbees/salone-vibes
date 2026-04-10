@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
 import { lexiconEntriesTable, usersTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { z } from "zod";
 import {
   DictionaryLookupBody,
   CreateLexiconEntryBody,
@@ -12,6 +13,15 @@ import {
   DeleteLexiconEntryParams,
 } from "@workspace/api-zod";
 import { getOrCreateUser } from "./profile";
+
+const DictionaryEntryResponseSchema = z.object({
+  term: z.string(),
+  definition: z.string(),
+  culturalContext: z.string(),
+  usageExamples: z.array(z.string()),
+  pronunciation: z.string().optional(),
+  partOfSpeech: z.string().optional(),
+});
 
 const router = Router();
 
@@ -112,15 +122,20 @@ Always respond in JSON format exactly matching this structure:
 
   const text = message.content[0].type === "text" ? message.content[0].text : "";
 
-  let entry: Record<string, unknown>;
+  let parsed: unknown;
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    entry = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
   } catch {
     return res.status(500).json({ error: "Failed to parse AI response" });
   }
 
-  return res.json(entry);
+  const validated = DictionaryEntryResponseSchema.safeParse(parsed);
+  if (!validated.success) {
+    return res.status(500).json({ error: "AI response did not match expected format" });
+  }
+
+  return res.json(validated.data);
 });
 
 router.get("/dictionary/lexicon", async (req, res) => {
