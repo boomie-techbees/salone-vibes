@@ -8,7 +8,10 @@ const router = Router();
 
 router.get("/events", async (req, res) => {
   const parseResult = ListEventsQueryParams.safeParse(req.query);
-  const location = parseResult.success ? parseResult.data.location : undefined;
+  if (!parseResult.success) {
+    return res.status(400).json({ error: parseResult.error.issues });
+  }
+  const location = parseResult.data.location;
 
   const now = new Date();
   const upcomingFilter = gte(eventsTable.eventDate, now);

@@ -153,7 +153,7 @@ function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
       onSuccess: () => {
         toast({
           title: "Event Submitted!",
-          description: "Your event has been submitted and will appear once approved.",
+          description: "Your event has been added to the community calendar.",
         });
         setOpen(false);
         form.reset();
