@@ -43,16 +43,32 @@ type ExtractedFields = {
   artists?: string | null;
 };
 
-function readFileAsBase64(file: File): Promise<{ base64: string; mimeType: string }> {
+const MAX_IMAGE_PX = 1200;
+const IMAGE_QUALITY = 0.85;
+
+function resizeAndEncodeImage(file: File): Promise<{ base64: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const [header, base64] = result.split(",");
-      const mimeType = header.replace("data:", "").replace(";base64", "");
-      resolve({ base64, mimeType });
-    };
     reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const { naturalWidth: w, naturalHeight: h } = img;
+        const scale = w > MAX_IMAGE_PX ? MAX_IMAGE_PX / w : 1;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(w * scale);
+        canvas.height = Math.round(h * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas not supported"));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", IMAGE_QUALITY);
+        const [header, base64] = dataUrl.split(",");
+        const mimeType = header.replace("data:", "").replace(";base64", "");
+        resolve({ base64, mimeType });
+      };
+      img.src = reader.result as string;
+    };
     reader.readAsDataURL(file);
   });
 }
@@ -101,7 +117,7 @@ function FlyerUpload({
       setIsExtracting(true);
 
       try {
-        const { base64, mimeType } = await readFileAsBase64(file);
+        const { base64, mimeType } = await resizeAndEncodeImage(file);
         const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
         const res = await fetch(`${basePath}/api/events/extract-flyer`, {
           method: "POST",

@@ -29,13 +29,17 @@ const router = Router();
 router.post("/events/extract-flyer", async (req, res) => {
   const parseResult = ExtractFlyerBody.safeParse(req.body);
   if (!parseResult.success) {
+    console.error("[extract-flyer] invalid body:", parseResult.error.issues);
     return res.status(400).json({ error: parseResult.error.issues });
   }
 
   const { imageBase64, mimeType } = parseResult.data;
+  const approxKB = Math.round((imageBase64.length * 3) / 4 / 1024);
+  console.log(`[extract-flyer] image size ~${approxKB}KB mimeType=${mimeType}`);
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
+    console.error("[extract-flyer] ANTHROPIC_API_KEY missing");
     return res.status(503).json({ error: "AI service not configured" });
   }
 
@@ -60,7 +64,7 @@ router.post("/events/extract-flyer", async (req, res) => {
 {
   "title": "the event name or title (string or null)",
   "description": "any tagline, description, or lineup details (string or null)",
-  "date": "the event date formatted as YYYY-MM-DD (string or null — if month/day only, use current year)",
+  "date": "the event date formatted as YYYY-MM-DD (string or null — if month/day only, use current year 2026)",
   "time": "start time in 12h format like '8:00 PM' (string or null)",
   "venue": "the venue or club name (string or null)",
   "city": "the city (string or null)",
@@ -75,7 +79,9 @@ Return ONLY the JSON object, no commentary.`,
         },
       ],
     });
+    console.log("[extract-flyer] Claude responded, stop_reason:", message.stop_reason);
   } catch (err) {
+    console.error("[extract-flyer] Anthropic API error:", err);
     const isApiErr = err instanceof Anthropic.APIError;
     const status = isApiErr ? err.status : 502;
     const detail = isApiErr ? err.message : "AI service unavailable";
@@ -83,19 +89,24 @@ Return ONLY the JSON object, no commentary.`,
   }
 
   const text = message.content[0].type === "text" ? message.content[0].text : "";
+  console.log("[extract-flyer] raw text:", text.slice(0, 300));
+
   let parsed: unknown;
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
-  } catch {
+  } catch (e) {
+    console.error("[extract-flyer] JSON parse error:", e, "raw:", text.slice(0, 500));
     return res.status(500).json({ error: "Failed to parse AI response" });
   }
 
   const validated = ExtractedEventSchema.safeParse(parsed);
   if (!validated.success) {
+    console.error("[extract-flyer] schema validation error:", validated.error.issues, "parsed:", parsed);
     return res.status(500).json({ error: "AI response did not match expected format" });
   }
 
+  console.log("[extract-flyer] success:", validated.data);
   return res.json(validated.data);
 });
 
