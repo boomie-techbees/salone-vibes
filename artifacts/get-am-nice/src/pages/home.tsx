@@ -186,10 +186,10 @@ function UpcomingEventsPreview() {
           <CardContent className="p-0 flex">
             <div className="bg-secondary/10 w-24 flex flex-col items-center justify-center p-2 text-center border-r border-border/50">
               <span className="text-xs font-bold text-secondary uppercase tracking-widest">
-                {format(new Date(event.eventDate), "MMM")}
+                {format(new Date(String(event.eventDate).slice(0, 10) + "T12:00:00"), "MMM")}
               </span>
               <span className="text-2xl font-clash font-bold text-secondary">
-                {format(new Date(event.eventDate), "dd")}
+                {format(new Date(String(event.eventDate).slice(0, 10) + "T12:00:00"), "dd")}
               </span>
             </div>
             <div className="p-4 flex-1">

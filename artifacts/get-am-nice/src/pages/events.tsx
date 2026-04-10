@@ -21,8 +21,7 @@ const submitEventSchema = z.object({
   title: z.string().min(3, "Title is required"),
   description: z.string().optional(),
   location: z.string().min(2, "Location is required"),
-  city: z.string().optional(),
-  country: z.string().optional(),
+  address: z.string().optional(),
   eventDate: z.string().min(1, "Date is required"),
   venue: z.string().optional(),
   ticketUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
@@ -236,8 +235,7 @@ function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
       title: "",
       description: "",
       location: "",
-      city: "",
-      country: "",
+      address: "",
       eventDate: "",
       venue: "",
       ticketUrl: "",
@@ -258,16 +256,16 @@ function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
       set("title", data.title);
       set("description", data.artists ? `${data.artists}${data.description ? ` · ${data.description}` : ""}` : data.description);
       set("venue", data.venue);
-      set("city", data.city);
-      set("country", data.country);
       set("eventDate", toDateInputValue(data.date));
       set("ticketUrl", data.ticketUrl);
 
-      const loc =
-        data.location ||
-        [data.city, data.country].filter(Boolean).join(", ") ||
-        data.venue ||
-        "";
+      const addrClean = [data.city, data.country].filter(Boolean).join(", ") || data.city || "";
+      if (addrClean) {
+        form.setValue("address", addrClean, { shouldDirty: true });
+        filled.add("address");
+      }
+
+      const loc = data.location || addrClean || data.venue || "";
       if (loc) {
         form.setValue("location", loc, { shouldDirty: true });
         filled.add("location");
@@ -284,8 +282,9 @@ function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
   }, [form]);
 
   const onSubmit = (data: SubmitEventValues) => {
+    const { address, ...rest } = data;
     submitMutation.mutate(
-      { data },
+      { data: { ...rest, city: address || undefined } },
       {
         onSuccess: () => {
           toast({ title: "Event Submitted!", description: "Your event has been added to the community calendar." });
@@ -377,40 +376,22 @@ function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="city"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        City
-                        {isAutoFilled("city") && <AutoBadge />}
-                      </FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. Freetown" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="country"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        Country
-                        {isAutoFilled("country") && <AutoBadge />}
-                      </FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. Sierra Leone" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      Address
+                      {isAutoFilled("address") && <AutoBadge />}
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. New Carrollton, MD  or  Freetown, Sierra Leone" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
@@ -553,7 +534,7 @@ export function Events() {
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/20 transition-colors" />
                 <div className="flex flex-col">
                   <span className="text-primary font-bold uppercase tracking-wider text-sm mb-1">
-                    {format(new Date(event.eventDate), "MMM dd, yyyy")}
+                    {format(new Date(String(event.eventDate).slice(0, 10) + "T12:00:00"), "MMM dd, yyyy")}
                   </span>
                   <h3 className="font-clash text-2xl font-bold text-foreground leading-tight line-clamp-2">
                     {event.title}
