@@ -108,17 +108,25 @@ Always respond in JSON format exactly matching this structure:
   "partOfSpeech": "noun/verb/adjective/interjection/etc"
 }`;
 
-  const message = await client.messages.create({
-    model: "claude-opus-4-5",
-    max_tokens: 1024,
-    messages: [
-      {
-        role: "user",
-        content: `Look up this Krio/Salone word or phrase: "${term}"`,
-      },
-    ],
-    system: systemPrompt,
-  });
+  let message: Anthropic.Message;
+  try {
+    message = await client.messages.create({
+      model: "claude-opus-4-5",
+      max_tokens: 1024,
+      messages: [
+        {
+          role: "user",
+          content: `Look up this Krio/Salone word or phrase: "${term}"`,
+        },
+      ],
+      system: systemPrompt,
+    });
+  } catch (err) {
+    const isApiErr = err instanceof Anthropic.APIError;
+    const status = isApiErr ? err.status : 502;
+    const detail = isApiErr ? err.message : "Dictionary service unavailable";
+    return res.status(status >= 400 && status < 600 ? status : 502).json({ error: detail });
+  }
 
   const text = message.content[0].type === "text" ? message.content[0].text : "";
 
