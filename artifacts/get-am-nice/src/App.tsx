@@ -55,7 +55,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background font-sans">
       <Navbar />
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 pt-24 pb-20 md:pb-8">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 pt-24 pb-8">
         {children}
       </main>
     </div>
