@@ -108,24 +108,32 @@ Always respond in JSON format exactly matching this structure:
   "partOfSpeech": "noun/verb/adjective/interjection/etc"
 }`;
 
-  let message: Anthropic.Message;
-  try {
-    message = await client.messages.create({
-      model: "claude-opus-4-5",
-      max_tokens: 1024,
-      messages: [
-        {
-          role: "user",
-          content: `Look up this Krio/Salone word or phrase: "${term}"`,
-        },
-      ],
-      system: systemPrompt,
-    });
-  } catch (err) {
-    const isApiErr = err instanceof Anthropic.APIError;
-    const status = isApiErr ? err.status : 502;
-    const detail = isApiErr ? err.message : "Dictionary service unavailable";
-    return res.status(status >= 400 && status < 600 ? status : 502).json({ error: detail });
+  const MODELS = ["claude-opus-4-5", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"];
+  const messageParams = {
+    max_tokens: 1024 as const,
+    messages: [{ role: "user" as const, content: `Look up this Krio/Salone word or phrase: "${term}"` }],
+    system: systemPrompt,
+  };
+
+  let message: Anthropic.Message | null = null;
+  let lastErr: Error | null = null;
+  for (const model of MODELS) {
+    try {
+      message = await client.messages.create({ model, ...messageParams });
+      break;
+    } catch (err) {
+      if (err instanceof Anthropic.APIError && (err.status === 404 || err.status === 400)) {
+        lastErr = err;
+        continue;
+      }
+      const isApiErr = err instanceof Anthropic.APIError;
+      const status = isApiErr ? err.status : 502;
+      const detail = isApiErr ? err.message : "Dictionary service unavailable";
+      return res.status(status >= 400 && status < 600 ? status : 502).json({ error: detail });
+    }
+  }
+  if (!message) {
+    return res.status(502).json({ error: lastErr?.message ?? "Dictionary service unavailable" });
   }
 
   const text = message.content[0].type === "text" ? message.content[0].text : "";
