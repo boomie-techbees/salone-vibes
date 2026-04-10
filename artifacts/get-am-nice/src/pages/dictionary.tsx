@@ -45,7 +45,7 @@ export function Dictionary() {
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+      <Tabs value={activeTab} onValueChange={(v) => { if (v === "lookup" || v === "lexicon") setActiveTab(v); }} className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-8 bg-card border border-border/50 h-14 p-1">
           <TabsTrigger value="lookup" className="text-base font-medium h-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
             Lookup
