@@ -1,10 +1,103 @@
 import { Router } from "express";
+import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
 import { eventsTable } from "@workspace/db";
 import { gte, or, ilike, and } from "drizzle-orm";
+import { z } from "zod";
 import { SubmitEventBody, ListEventsQueryParams } from "@workspace/api-zod";
 
+const ExtractFlyerBody = z.object({
+  imageBase64: z.string().min(1),
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]),
+});
+
+const ExtractedEventSchema = z.object({
+  title: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  date: z.string().nullable().optional(),
+  time: z.string().nullable().optional(),
+  venue: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  ticketUrl: z.string().nullable().optional(),
+  artists: z.string().nullable().optional(),
+});
+
 const router = Router();
+
+router.post("/events/extract-flyer", async (req, res) => {
+  const parseResult = ExtractFlyerBody.safeParse(req.body);
+  if (!parseResult.success) {
+    return res.status(400).json({ error: parseResult.error.issues });
+  }
+
+  const { imageBase64, mimeType } = parseResult.data;
+
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    return res.status(503).json({ error: "AI service not configured" });
+  }
+
+  const client = new Anthropic({ apiKey: anthropicKey });
+
+  let message: Anthropic.Message;
+  try {
+    message = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: { type: "base64", media_type: mimeType, data: imageBase64 },
+            },
+            {
+              type: "text",
+              text: `This is an event flyer. Extract every piece of information you can see and return it as a JSON object with these exact keys:
+{
+  "title": "the event name or title (string or null)",
+  "description": "any tagline, description, or lineup details (string or null)",
+  "date": "the event date formatted as YYYY-MM-DD (string or null — if month/day only, use current year)",
+  "time": "start time in 12h format like '8:00 PM' (string or null)",
+  "venue": "the venue or club name (string or null)",
+  "city": "the city (string or null)",
+  "country": "the country (string or null)",
+  "location": "a combined short location string like 'Freetown, Sierra Leone' (string or null)",
+  "ticketUrl": "a ticket purchase URL if visible (string or null)",
+  "artists": "performing artists or DJs, comma-separated (string or null)"
+}
+Return ONLY the JSON object, no commentary.`,
+            },
+          ],
+        },
+      ],
+    });
+  } catch (err) {
+    const isApiErr = err instanceof Anthropic.APIError;
+    const status = isApiErr ? err.status : 502;
+    const detail = isApiErr ? err.message : "AI service unavailable";
+    return res.status(status >= 400 && status < 600 ? status : 502).json({ error: detail });
+  }
+
+  const text = message.content[0].type === "text" ? message.content[0].text : "";
+  let parsed: unknown;
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  } catch {
+    return res.status(500).json({ error: "Failed to parse AI response" });
+  }
+
+  const validated = ExtractedEventSchema.safeParse(parsed);
+  if (!validated.success) {
+    return res.status(500).json({ error: "AI response did not match expected format" });
+  }
+
+  return res.json(validated.data);
+});
 
 router.get("/events", async (req, res) => {
   const parseResult = ListEventsQueryParams.safeParse(req.query);

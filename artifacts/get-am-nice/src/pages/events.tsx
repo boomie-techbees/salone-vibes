@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { MapPin, Calendar as CalendarIcon, Ticket, Plus, Check } from "lucide-react";
+import { MapPin, Calendar as CalendarIcon, Ticket, Plus, Upload, X, Sparkles, Loader2 } from "lucide-react";
 
 import { useListEvents, useSubmitEvent, getListEventsQueryKey } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -11,7 +11,8 @@ import { queryClient } from "@/lib/queryClient";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,16 +25,469 @@ const submitEventSchema = z.object({
   country: z.string().optional(),
   eventDate: z.string().min(1, "Date is required"),
   venue: z.string().optional(),
-  ticketUrl: z.string().url("Must be a valid URL").optional().or(z.literal('')),
+  ticketUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 
 type SubmitEventValues = z.infer<typeof submitEventSchema>;
+
+type ExtractedFields = {
+  title?: string | null;
+  description?: string | null;
+  date?: string | null;
+  time?: string | null;
+  venue?: string | null;
+  city?: string | null;
+  country?: string | null;
+  location?: string | null;
+  ticketUrl?: string | null;
+  artists?: string | null;
+};
+
+function readFileAsBase64(file: File): Promise<{ base64: string; mimeType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const [header, base64] = result.split(",");
+      const mimeType = header.replace("data:", "").replace(";base64", "");
+      resolve({ base64, mimeType });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function toDateInputValue(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().split("T")[0];
+  } catch {
+    return "";
+  }
+}
+
+function FlyerUpload({
+  onExtracted,
+  onClear,
+}: {
+  onExtracted: (fields: ExtractedFields) => void;
+  onClear: () => void;
+}) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extracted, setExtracted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      if (!file.type.match(/^image\/(jpeg|jpg|png|webp|gif)$/)) {
+        setError("Please upload a JPG or PNG image.");
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        setError("Image must be under 10MB.");
+        return;
+      }
+
+      setError(null);
+      setExtracted(false);
+      const objectUrl = URL.createObjectURL(file);
+      setPreview(objectUrl);
+      setIsExtracting(true);
+
+      try {
+        const { base64, mimeType } = await readFileAsBase64(file);
+        const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+        const res = await fetch(`${basePath}/api/events/extract-flyer`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: base64, mimeType }),
+        });
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || "Failed to analyse flyer");
+        }
+
+        const data: ExtractedFields = await res.json();
+        onExtracted(data);
+        setExtracted(true);
+        toast({ title: "Flyer scanned!", description: "Details filled in below — review and edit before submitting." });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Could not extract details";
+        setError(msg);
+        toast({ variant: "destructive", title: "Scan failed", description: msg });
+      } finally {
+        setIsExtracting(false);
+      }
+    },
+    [onExtracted, toast]
+  );
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFile(file);
+  };
+
+  const clear = () => {
+    setPreview(null);
+    setExtracted(false);
+    setError(null);
+    if (inputRef.current) inputRef.current.value = "";
+    onClear();
+  };
+
+  if (preview) {
+    return (
+      <div className="rounded-xl border-2 border-primary/30 bg-primary/5 overflow-hidden">
+        <div className="flex items-start gap-3 p-3">
+          <img
+            src={preview}
+            alt="Event flyer preview"
+            className="w-20 h-20 object-cover rounded-lg shrink-0 border border-border/50"
+          />
+          <div className="flex-1 min-w-0">
+            {isExtracting ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                <span>Reading your flyer…</span>
+              </div>
+            ) : extracted ? (
+              <div className="flex items-center gap-1.5 text-sm text-primary font-medium mt-1">
+                <Sparkles className="w-4 h-4" />
+                <span>Details extracted — check the form below</span>
+              </div>
+            ) : error ? (
+              <p className="text-sm text-destructive mt-1">{error}</p>
+            ) : null}
+          </div>
+          <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-muted-foreground" onClick={clear}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 transition-colors cursor-pointer group"
+      onClick={() => inputRef.current?.click()}
+      onDrop={handleDrop}
+      onDragOver={(e) => e.preventDefault()}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png"
+        className="hidden"
+        onChange={handleInputChange}
+      />
+      <div className="flex flex-col items-center justify-center py-5 px-4 text-center gap-2">
+        <div className="rounded-full bg-primary/10 p-3 group-hover:bg-primary/20 transition-colors">
+          <Upload className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">Upload a flyer to auto-fill the form</p>
+          <p className="text-xs text-muted-foreground mt-0.5">JPG or PNG · Drag & drop or click to browse</p>
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
+function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
+  const submitMutation = useSubmitEvent();
+
+  const form = useForm<SubmitEventValues>({
+    resolver: zodResolver(submitEventSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      location: "",
+      city: "",
+      country: "",
+      eventDate: "",
+      venue: "",
+      ticketUrl: "",
+    },
+  });
+
+  const handleExtracted = useCallback(
+    (data: ExtractedFields) => {
+      const filled = new Set<string>();
+
+      const set = (field: keyof SubmitEventValues, value: string | null | undefined) => {
+        if (value) {
+          form.setValue(field, value, { shouldDirty: true });
+          filled.add(field);
+        }
+      };
+
+      set("title", data.title);
+      set("description", data.artists ? `${data.artists}${data.description ? ` · ${data.description}` : ""}` : data.description);
+      set("venue", data.venue);
+      set("city", data.city);
+      set("country", data.country);
+      set("eventDate", toDateInputValue(data.date));
+      set("ticketUrl", data.ticketUrl);
+
+      const loc =
+        data.location ||
+        [data.city, data.country].filter(Boolean).join(", ") ||
+        data.venue ||
+        "";
+      if (loc) {
+        form.setValue("location", loc, { shouldDirty: true });
+        filled.add("location");
+      }
+
+      setAutoFilledFields(filled);
+    },
+    [form]
+  );
+
+  const handleClear = useCallback(() => {
+    form.reset();
+    setAutoFilledFields(new Set());
+  }, [form]);
+
+  const onSubmit = (data: SubmitEventValues) => {
+    submitMutation.mutate(
+      { data },
+      {
+        onSuccess: () => {
+          toast({ title: "Event Submitted!", description: "Your event has been added to the community calendar." });
+          setOpen(false);
+          form.reset();
+          setAutoFilledFields(new Set());
+          queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
+        },
+        onError: () => {
+          toast({ variant: "destructive", title: "Submission Failed", description: "There was a problem submitting your event. Please try again." });
+        },
+      }
+    );
+  };
+
+  const isAutoFilled = (field: string) => autoFilledFields.has(field);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {trigger || (
+          <Button variant="outline" className="border-primary/30 hover:bg-primary/10 text-primary whitespace-nowrap">
+            <Plus className="w-4 h-4 mr-1" /> Add Event
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-clash text-2xl">Submit an Event</DialogTitle>
+          <DialogDescription>
+            Know about a Salone event? Upload a flyer to auto-fill the details, or fill in the form manually.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5 mt-2">
+          <FlyerUpload onExtracted={handleExtracted} onClear={handleClear} />
+
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      Event Title *
+                      {isAutoFilled("title") && <AutoBadge />}
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. Freetown Music Festival" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="eventDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        Date *
+                        {isAutoFilled("eventDate") && <AutoBadge />}
+                      </FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="venue"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        Venue
+                        {isAutoFilled("venue") && <AutoBadge />}
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. National Stadium" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        City
+                        {isAutoFilled("city") && <AutoBadge />}
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Freetown" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="country"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        Country
+                        {isAutoFilled("country") && <AutoBadge />}
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Sierra Leone" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      Location Display *
+                      {isAutoFilled("location") && <AutoBadge />}
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. Freetown, Sierra Leone" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ticketUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      Ticket URL
+                      {isAutoFilled("ticketUrl") && <AutoBadge />}
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://..." type="url" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      Description / Artists
+                      {isAutoFilled("description") && <AutoBadge />}
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Artists, lineup, or event details…"
+                        className="resize-none h-20"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="pt-2 flex justify-end gap-3">
+                <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submitMutation.isPending}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
+                >
+                  {submitMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting…</>
+                  ) : (
+                    "Submit Event"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AutoBadge() {
+  return (
+    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal gap-1 bg-primary/10 text-primary border-0">
+      <Sparkles className="w-2.5 h-2.5" />
+      Auto-filled
+    </Badge>
+  );
+}
 
 export function Events() {
   const [locationFilter, setLocationFilter] = useState("");
   const [debouncedFilter, setDebouncedFilter] = useState("");
 
-  // Simple debounce for filter
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedFilter(locationFilter), 500);
     return () => clearTimeout(timer);
@@ -51,10 +505,9 @@ export function Events() {
           <h1 className="font-clash text-4xl font-bold text-foreground mb-2">Salone Events</h1>
           <p className="text-muted-foreground text-lg">Find the best parties, concerts, and cultural gatherings.</p>
         </div>
-        
         <div className="flex items-center gap-3">
-          <Input 
-            placeholder="Filter by city..." 
+          <Input
+            placeholder="Filter by city..."
             value={locationFilter}
             onChange={(e) => setLocationFilter(e.target.value)}
             className="w-full md:w-48 bg-card border-primary/20 focus-visible:ring-primary"
@@ -66,7 +519,7 @@ export function Events() {
       {isLoading ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i} className="animate-pulse h-[300px]"></Card>
+            <Card key={i} className="animate-pulse h-[300px]" />
           ))}
         </div>
       ) : !events || events.length === 0 ? (
@@ -81,7 +534,7 @@ export function Events() {
           {events.map((event) => (
             <Card key={event.id} className="overflow-hidden hover:shadow-md transition-all border-border/60 hover:border-primary/40 group flex flex-col">
               <div className="bg-primary/5 p-6 border-b border-border/50 relative overflow-hidden">
-                <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/20 transition-colors"></div>
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/20 transition-colors" />
                 <div className="flex flex-col">
                   <span className="text-primary font-bold uppercase tracking-wider text-sm mb-1">
                     {format(new Date(event.eventDate), "MMM dd, yyyy")}
@@ -91,7 +544,7 @@ export function Events() {
                   </h3>
                 </div>
               </div>
-              
+
               <CardContent className="p-6 flex-1 flex flex-col gap-4">
                 <div className="flex items-start gap-3 text-muted-foreground">
                   <MapPin className="w-5 h-5 shrink-0 mt-0.5 text-secondary" />
@@ -100,14 +553,11 @@ export function Events() {
                     <p>{[event.city, event.country].filter(Boolean).join(", ") || event.location}</p>
                   </div>
                 </div>
-                
                 {event.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-3 mt-2">
-                    {event.description}
-                  </p>
+                  <p className="text-sm text-muted-foreground line-clamp-3 mt-2">{event.description}</p>
                 )}
               </CardContent>
-              
+
               <CardFooter className="p-6 pt-0 mt-auto">
                 {event.ticketUrl ? (
                   <Button asChild className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-bold group-hover:shadow-md transition-all">
@@ -126,204 +576,5 @@ export function Events() {
         </div>
       )}
     </div>
-  );
-}
-
-function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const { toast } = useToast();
-  const submitMutation = useSubmitEvent();
-
-  const form = useForm<SubmitEventValues>({
-    resolver: zodResolver(submitEventSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      location: "",
-      city: "",
-      country: "",
-      eventDate: "",
-      venue: "",
-      ticketUrl: "",
-    },
-  });
-
-  const onSubmit = (data: SubmitEventValues) => {
-    submitMutation.mutate({ data }, {
-      onSuccess: () => {
-        toast({
-          title: "Event Submitted!",
-          description: "Your event has been added to the community calendar.",
-        });
-        setOpen(false);
-        form.reset();
-        // Invalidate events list
-        queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
-      },
-      onError: () => {
-        toast({
-          variant: "destructive",
-          title: "Submission Failed",
-          description: "There was a problem submitting your event. Please try again.",
-        });
-      }
-    });
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button variant="outline" className="border-primary/30 hover:bg-primary/10 text-primary whitespace-nowrap">
-            <Plus className="w-4 h-4 mr-1" /> Add Event
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="font-clash text-2xl">Submit an Event</DialogTitle>
-          <DialogDescription>
-            Know about a Salone event? Share it with the community.
-          </DialogDescription>
-        </DialogHeader>
-
-        <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Event Title *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Freetown Music Festival" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="eventDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date *</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="venue"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Venue</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. National Stadium" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="city"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>City</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. Freetown" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="country"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Country</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. Sierra Leone" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location Display String *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Freetown, SL" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="ticketUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ticket URL</FormLabel>
-                    <FormControl>
-                      <Input placeholder="https://..." type="url" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Tell us more about the event..." 
-                        className="resize-none h-24"
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="pt-4 flex justify-end gap-3">
-                <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={submitMutation.isPending}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
-                >
-                  {submitMutation.isPending ? "Submitting..." : "Submit Event"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-      </DialogContent>
-    </Dialog>
   );
 }
