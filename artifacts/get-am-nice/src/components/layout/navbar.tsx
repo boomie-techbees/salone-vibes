@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Show, useUser } from "@clerk/react";
-import { Home, BookA, Mic2, Calendar, User } from "lucide-react";
+import { Home, BookA, Mic2, Calendar, Archive, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -13,7 +13,13 @@ export function Navbar() {
     { href: "/dictionary", label: "Dictionary", icon: BookA },
     { href: "/artists", label: "Artists", icon: Mic2 },
     { href: "/events", label: "Events", icon: Calendar },
+    { href: "/stash", label: "Stash", icon: Archive },
   ];
+
+  const isActive = (href: string) => {
+    if (href === "/") return location === "/";
+    return location === href || location.startsWith(href + "/");
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 h-16 bg-primary text-primary-foreground z-50 flex items-center justify-between px-3 md:px-8 shadow-md">
@@ -34,7 +40,7 @@ export function Navbar() {
             href={item.href}
             className={cn(
               "h-full flex items-center px-4 font-medium transition-colors hover:bg-primary/90 relative",
-              location === item.href &&
+              isActive(item.href) &&
                 "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-1 after:bg-accent"
             )}
           >
@@ -50,8 +56,8 @@ export function Navbar() {
             key={item.href}
             href={item.href}
             className={cn(
-              "flex flex-col items-center justify-center w-10 h-10 rounded-lg transition-colors",
-              location === item.href
+              "flex flex-col items-center justify-center w-9 h-10 rounded-lg transition-colors",
+              isActive(item.href)
                 ? "bg-primary-foreground/15 text-primary-foreground"
                 : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
             )}
@@ -59,8 +65,8 @@ export function Navbar() {
           >
             <item.icon
               className={cn(
-                "h-5 w-5 transition-transform",
-                location === item.href && "scale-110 stroke-[2.5px]"
+                "h-[18px] w-[18px] transition-transform",
+                isActive(item.href) && "scale-110 stroke-[2.5px]"
               )}
             />
           </Link>

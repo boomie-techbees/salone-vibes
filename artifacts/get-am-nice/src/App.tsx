@@ -14,6 +14,7 @@ import { Artists } from "@/pages/artists";
 import { ArtistDetail } from "@/pages/artist-detail";
 import { Dictionary } from "@/pages/dictionary";
 import { Events } from "@/pages/events";
+import { Stash } from "@/pages/stash";
 import { ProfilePage } from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 
@@ -98,6 +99,7 @@ function ClerkProviderWithRoutes() {
               <Route path="/artists" component={Artists} />
               <Route path="/artists/:id" component={ArtistDetail} />
               <Route path="/events" component={Events} />
+              <Route path="/stash" component={Stash} />
               <Route path="/profile" component={ProfilePage} />
               <Route component={NotFound} />
             </Switch>
