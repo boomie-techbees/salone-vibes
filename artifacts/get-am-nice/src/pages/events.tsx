@@ -537,7 +537,7 @@ function EditEventButton({ event }: { event: Event }) {
       <Button
         size="icon"
         variant="ghost"
-        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all"
+        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
         onClick={() => setEditing(true)}
       >
         <Pencil className="w-4 h-4" />
@@ -571,7 +571,7 @@ function DeleteEventButton({ eventId, eventTitle }: { eventId: number; eventTitl
         <Button
           size="icon"
           variant="ghost"
-          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
           disabled={deleteMutation.isPending}
         >
           {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -649,9 +649,9 @@ export function Events() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {events.map((event) => (
-            <Card key={event.id} className="overflow-hidden hover:shadow-md transition-all border-border/60 hover:border-primary/40 group flex flex-col">
+            <Card key={event.id} className="overflow-hidden hover:shadow-md transition-all border-border/60 hover:border-primary/40 flex flex-col">
               <div className="bg-primary/5 p-6 border-b border-border/50 relative overflow-hidden">
-                <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/20 transition-colors" />
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full blur-xl" />
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex flex-col min-w-0">
                     <span className="text-primary font-bold uppercase tracking-wider text-sm mb-1">
@@ -661,12 +661,12 @@ export function Events() {
                       {event.title}
                     </h3>
                   </div>
-                  <div className="shrink-0 pt-0.5 flex gap-1">
-                    {(isAdminUser || (currentClerkId && currentClerkId === event.submittedBy)) && (
+                  {(isAdminUser || (currentClerkId && currentClerkId === event.submittedBy)) && (
+                    <div className="shrink-0 pt-0.5 flex gap-1">
                       <EditEventButton event={event} />
-                    )}
-                    <DeleteEventButton eventId={event.id} eventTitle={event.title} />
-                  </div>
+                      <DeleteEventButton eventId={event.id} eventTitle={event.title} />
+                    </div>
+                  )}
                 </div>
               </div>
 
