@@ -2,7 +2,7 @@ import { Router } from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
 import { eventsTable } from "@workspace/db";
-import { gte, or, ilike, and } from "drizzle-orm";
+import { gte, or, ilike, and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { SubmitEventBody, ListEventsQueryParams } from "@workspace/api-zod";
 
@@ -175,6 +175,26 @@ router.post("/events", async (req, res) => {
     .returning();
 
   return res.status(201).json(event);
+});
+
+router.delete("/events/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: "Invalid event id" });
+  }
+
+  const existing = await db
+    .select({ id: eventsTable.id })
+    .from(eventsTable)
+    .where(eq(eventsTable.id, id))
+    .limit(1);
+
+  if (existing.length === 0) {
+    return res.status(404).json({ error: "Event not found" });
+  }
+
+  await db.delete(eventsTable).where(eq(eventsTable.id, id));
+  return res.status(204).send();
 });
 
 export default router;

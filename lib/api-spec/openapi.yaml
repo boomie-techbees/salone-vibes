@@ -234,6 +234,23 @@ paths:
         "400":
           description: Bad request
 
+  /events/{id}:
+    delete:
+      operationId: deleteEvent
+      tags: [events]
+      summary: Delete an event by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
   /events/upcoming-preview:
     get:
       operationId: getUpcomingEventsPreview

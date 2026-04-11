@@ -3,9 +3,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { MapPin, Calendar as CalendarIcon, Ticket, Plus, Upload, X, Sparkles, Loader2 } from "lucide-react";
+import { MapPin, Calendar as CalendarIcon, Ticket, Plus, Upload, X, Sparkles, Loader2, Trash2 } from "lucide-react";
 
-import { useListEvents, useSubmitEvent, getListEventsQueryKey } from "@workspace/api-client-react";
+import { useListEvents, useSubmitEvent, useDeleteEvent, getListEventsQueryKey } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
@@ -481,6 +482,55 @@ function AutoBadge() {
   );
 }
 
+function DeleteEventButton({ eventId, eventTitle }: { eventId: number; eventTitle: string }) {
+  const { toast } = useToast();
+  const deleteMutation = useDeleteEvent();
+
+  const handleDelete = () => {
+    deleteMutation.mutate({ id: eventId }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
+        toast({ title: "Event deleted", description: `"${eventTitle}" has been removed.` });
+      },
+      onError: () => {
+        toast({ variant: "destructive", title: "Delete failed", description: "Could not delete this event. Please try again." });
+      },
+    });
+  };
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
+          disabled={deleteMutation.isPending}
+        >
+          {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this event?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently remove <span className="font-medium text-foreground">"{eventTitle}"</span> from the community calendar. This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            Delete Event
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export function Events() {
   const [locationFilter, setLocationFilter] = useState("");
   const [debouncedFilter, setDebouncedFilter] = useState("");
@@ -532,13 +582,18 @@ export function Events() {
             <Card key={event.id} className="overflow-hidden hover:shadow-md transition-all border-border/60 hover:border-primary/40 group flex flex-col">
               <div className="bg-primary/5 p-6 border-b border-border/50 relative overflow-hidden">
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/20 transition-colors" />
-                <div className="flex flex-col">
-                  <span className="text-primary font-bold uppercase tracking-wider text-sm mb-1">
-                    {format(new Date(String(event.eventDate).slice(0, 10) + "T12:00:00"), "MMM dd, yyyy")}
-                  </span>
-                  <h3 className="font-clash text-2xl font-bold text-foreground leading-tight line-clamp-2">
-                    {event.title}
-                  </h3>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-primary font-bold uppercase tracking-wider text-sm mb-1">
+                      {format(new Date(String(event.eventDate).slice(0, 10) + "T12:00:00"), "MMM dd, yyyy")}
+                    </span>
+                    <h3 className="font-clash text-2xl font-bold text-foreground leading-tight line-clamp-2">
+                      {event.title}
+                    </h3>
+                  </div>
+                  <div className="shrink-0 pt-0.5">
+                    <DeleteEventButton eventId={event.id} eventTitle={event.title} />
+                  </div>
                 </div>
               </div>
 

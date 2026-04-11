@@ -177,6 +177,13 @@ export const SubmitEventBody = zod.object({
 });
 
 /**
+ * @summary Delete an event by ID
+ */
+export const DeleteEventParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary Get a short preview of the next 3 upcoming events (for the home screen)
  */
 export const GetUpcomingEventsPreviewResponseItem = zod.object({

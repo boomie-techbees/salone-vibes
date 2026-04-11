@@ -953,6 +953,90 @@ export const useSubmitEvent = <
 };
 
 /**
+ * @summary Delete an event by ID
+ */
+export const getDeleteEventUrl = (id: number) => {
+  return `/api/events/${id}`;
+};
+
+export const deleteEvent = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteEventUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteEventMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteEvent>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteEvent>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteEvent>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteEvent(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteEvent>>
+>;
+
+export type DeleteEventMutationError = ErrorType<void>;
+
+/**
+ * @summary Delete an event by ID
+ */
+export const useDeleteEvent = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteEvent>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteEvent>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteEventMutationOptions(options));
+};
+
+/**
  * @summary Get a short preview of the next 3 upcoming events (for the home screen)
  */
 export const getGetUpcomingEventsPreviewUrl = () => {
