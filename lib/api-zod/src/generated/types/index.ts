@@ -18,6 +18,8 @@ export * from "./healthStatus";
 export * from "./lexiconEntry";
 export * from "./listEventsParams";
 export * from "./song";
+export * from "./stashArtistBody";
+export * from "./stashedArtistEntry";
 export * from "./submitEventBody";
 export * from "./updateArtistBody";
 export * from "./updateLexiconEntryBody";

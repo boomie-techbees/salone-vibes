@@ -5,6 +5,7 @@ import dictionaryRouter from "./dictionary";
 import eventsRouter from "./events";
 import songsRouter from "./songs";
 import artistsRouter from "./artists";
+import stashRouter from "./stash";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(dictionaryRouter);
 router.use(eventsRouter);
 router.use(songsRouter);
 router.use(artistsRouter);
+router.use(stashRouter);
 
 export default router;

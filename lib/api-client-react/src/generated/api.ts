@@ -28,6 +28,8 @@ import type {
   LexiconEntry,
   ListEventsParams,
   Song,
+  StashArtistBody,
+  StashedArtistEntry,
   SubmitEventBody,
   UpdateArtistBody,
   UpdateLexiconEntryBody,
@@ -1853,4 +1855,249 @@ export const useDeleteSong = <
   TContext
 > => {
   return useMutation(getDeleteSongMutationOptions(options));
+};
+
+/**
+ * @summary List artists saved in the user's stash
+ */
+export const getListStashedArtistsUrl = () => {
+  return `/api/stash/artists`;
+};
+
+export const listStashedArtists = async (
+  options?: RequestInit,
+): Promise<StashedArtistEntry[]> => {
+  return customFetch<StashedArtistEntry[]>(getListStashedArtistsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListStashedArtistsQueryKey = () => {
+  return [`/api/stash/artists`] as const;
+};
+
+export const getListStashedArtistsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listStashedArtists>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listStashedArtists>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListStashedArtistsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listStashedArtists>>
+  > = ({ signal }) => listStashedArtists({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listStashedArtists>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListStashedArtistsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listStashedArtists>>
+>;
+export type ListStashedArtistsQueryError = ErrorType<void>;
+
+/**
+ * @summary List artists saved in the user's stash
+ */
+
+export function useListStashedArtists<
+  TData = Awaited<ReturnType<typeof listStashedArtists>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listStashedArtists>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListStashedArtistsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Save an artist to the user's stash
+ */
+export const getStashArtistUrl = () => {
+  return `/api/stash/artists`;
+};
+
+export const stashArtist = async (
+  stashArtistBody: StashArtistBody,
+  options?: RequestInit,
+): Promise<StashedArtistEntry> => {
+  return customFetch<StashedArtistEntry>(getStashArtistUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(stashArtistBody),
+  });
+};
+
+export const getStashArtistMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof stashArtist>>,
+    TError,
+    { data: BodyType<StashArtistBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof stashArtist>>,
+  TError,
+  { data: BodyType<StashArtistBody> },
+  TContext
+> => {
+  const mutationKey = ["stashArtist"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof stashArtist>>,
+    { data: BodyType<StashArtistBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return stashArtist(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StashArtistMutationResult = NonNullable<
+  Awaited<ReturnType<typeof stashArtist>>
+>;
+export type StashArtistMutationBody = BodyType<StashArtistBody>;
+export type StashArtistMutationError = ErrorType<void>;
+
+/**
+ * @summary Save an artist to the user's stash
+ */
+export const useStashArtist = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof stashArtist>>,
+    TError,
+    { data: BodyType<StashArtistBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof stashArtist>>,
+  TError,
+  { data: BodyType<StashArtistBody> },
+  TContext
+> => {
+  return useMutation(getStashArtistMutationOptions(options));
+};
+
+/**
+ * @summary Remove an artist from the user's stash
+ */
+export const getUnstashArtistUrl = (artistId: number) => {
+  return `/api/stash/artists/${artistId}`;
+};
+
+export const unstashArtist = async (
+  artistId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getUnstashArtistUrl(artistId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getUnstashArtistMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unstashArtist>>,
+    TError,
+    { artistId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unstashArtist>>,
+  TError,
+  { artistId: number },
+  TContext
+> => {
+  const mutationKey = ["unstashArtist"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unstashArtist>>,
+    { artistId: number }
+  > = (props) => {
+    const { artistId } = props ?? {};
+
+    return unstashArtist(artistId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnstashArtistMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unstashArtist>>
+>;
+
+export type UnstashArtistMutationError = ErrorType<void>;
+
+/**
+ * @summary Remove an artist from the user's stash
+ */
+export const useUnstashArtist = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unstashArtist>>,
+    TError,
+    { artistId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof unstashArtist>>,
+  TError,
+  { artistId: number },
+  TContext
+> => {
+  return useMutation(getUnstashArtistMutationOptions(options));
 };

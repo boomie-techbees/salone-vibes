@@ -147,6 +147,18 @@ export interface UpdateArtistBody {
   links?: ArtistLink[] | null;
 }
 
+export interface StashedArtistEntry {
+  /** Stash entry id */
+  id: number;
+  artistId: number;
+  createdAt: string;
+  artist: Artist;
+}
+
+export interface StashArtistBody {
+  artistId: number;
+}
+
 export type ListEventsParams = {
   /**
    * Filter events by city or country

@@ -1,11 +1,16 @@
 import { useState } from "react";
 import { useRoute, Link } from "wouter";
-import { ArrowLeft, Sparkles, Pencil, Check, X, Loader2, Plus, ExternalLink, Tag, Trash2 } from "lucide-react";
+import { ArrowLeft, Sparkles, Pencil, Check, X, Loader2, Plus, ExternalLink, Tag, Trash2, Archive, CheckCheck } from "lucide-react";
+import { useAuth } from "@clerk/react";
 import {
   useGetArtist,
   useUpdateArtist,
+  useListStashedArtists,
+  useStashArtist,
+  useUnstashArtist,
   getListArtistsQueryKey,
   getGetArtistQueryKey,
+  getListStashedArtistsQueryKey,
 } from "@workspace/api-client-react";
 import type { Artist, ArtistLink } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/queryClient";
@@ -461,6 +466,91 @@ function LinksEditor({
   );
 }
 
+function StashButton({ artistId }: { artistId: number }) {
+  const { isSignedIn } = useAuth();
+  const { toast } = useToast();
+
+  const { data: stashed = [], isLoading: stashLoading } = useListStashedArtists({
+    query: { queryKey: getListStashedArtistsQueryKey(), enabled: !!isSignedIn },
+  });
+
+  const isSaved = stashed.some((s) => s.artistId === artistId);
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: getListStashedArtistsQueryKey() });
+
+  const stashMutation = useStashArtist({
+    mutation: {
+      onSuccess: () => {
+        invalidate();
+        toast({ title: "Saved to Stash" });
+      },
+      onError: () =>
+        toast({ variant: "destructive", title: "Couldn't save to Stash" }),
+    },
+  });
+
+  const unstashMutation = useUnstashArtist({
+    mutation: {
+      onSuccess: () => {
+        invalidate();
+        toast({ title: "Removed from Stash" });
+      },
+      onError: () =>
+        toast({ variant: "destructive", title: "Couldn't remove from Stash" }),
+    },
+  });
+
+  if (!isSignedIn) {
+    return (
+      <Button asChild variant="outline" size="sm" className="rounded-full gap-2">
+        <Link href="/sign-in">
+          <Archive className="w-4 h-4" />
+          Save to Stash
+        </Link>
+      </Button>
+    );
+  }
+
+  const isPending = stashMutation.isPending || unstashMutation.isPending;
+
+  if (isSaved) {
+    return (
+      <Button
+        variant="secondary"
+        size="sm"
+        className="rounded-full gap-2"
+        disabled={isPending || stashLoading}
+        onClick={() => unstashMutation.mutate({ artistId })}
+      >
+        {isPending ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <CheckCheck className="w-4 h-4 text-primary" />
+        )}
+        Saved
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="rounded-full gap-2 border-primary/40 hover:border-primary hover:bg-primary/5"
+      disabled={isPending || stashLoading}
+      onClick={() => stashMutation.mutate({ data: { artistId } })}
+    >
+      {isPending ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : (
+        <Archive className="w-4 h-4" />
+      )}
+      Save to Stash
+    </Button>
+  );
+}
+
 export function ArtistDetail() {
   const [, params] = useRoute("/artists/:id");
   const id = Number(params?.id);
@@ -509,10 +599,11 @@ export function ArtistDetail() {
 
       <div className="flex gap-5 items-start">
         <ArtistPhoto artist={artist} />
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 space-y-3">
           <h1 className="font-clash text-3xl md:text-4xl font-bold leading-tight">
             {artist.name}
           </h1>
+          <StashButton artistId={artist.id} />
         </div>
       </div>
 

@@ -28,6 +28,9 @@ import {
   useUpdateSong,
   useDeleteSong,
   getListSongsQueryKey,
+  useListStashedArtists,
+  useUnstashArtist,
+  getListStashedArtistsQueryKey,
 } from "@workspace/api-client-react";
 import type { LexiconEntry, Song } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -626,19 +629,111 @@ function SongsILove() {
   );
 }
 
-// ─── My Artists placeholder ──────────────────────────────────────────────────
+// ─── My Artists ──────────────────────────────────────────────────────────────
 
 function MyArtists() {
+  const { toast } = useToast();
+  const { data: stashed = [], isLoading } = useListStashedArtists({
+    query: { queryKey: getListStashedArtistsQueryKey() },
+  });
+
+  const unstashMutation = useUnstashArtist({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: getListStashedArtistsQueryKey(),
+        });
+        toast({ title: "Removed from Stash" });
+      },
+      onError: () =>
+        toast({ variant: "destructive", title: "Couldn't remove artist" }),
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-20 rounded-xl bg-muted/60 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (stashed.length === 0) {
+    return (
+      <Card className="border-dashed border-2 bg-transparent">
+        <CardContent className="p-10 text-center flex flex-col items-center">
+          <Mic2 className="w-12 h-12 text-muted-foreground/40 mb-4" />
+          <h3 className="text-xl font-clash font-bold mb-2">No artists saved yet</h3>
+          <p className="text-muted-foreground text-sm max-w-xs mb-5">
+            Visit an artist page and hit "Save to Stash".
+          </p>
+          <Link href="/artists">
+            <Button variant="outline" className="rounded-full">
+              Browse Artists
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="border-dashed border-2 bg-transparent">
-      <CardContent className="p-10 text-center flex flex-col items-center">
-        <Mic2 className="w-12 h-12 text-muted-foreground/40 mb-4" />
-        <h3 className="text-xl font-clash font-bold mb-2">My Artists</h3>
-        <p className="text-muted-foreground text-sm max-w-xs">
-          Follow your favourite Salone artists — coming soon.
-        </p>
-      </CardContent>
-    </Card>
+    <div className="grid gap-3 sm:grid-cols-2">
+      {stashed.map((entry) => {
+        const artist = entry.artist;
+        const initials = artist.name
+          .split(" ")
+          .map((w: string) => w[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase();
+
+        return (
+          <div
+            key={entry.id}
+            className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/40 group"
+          >
+            <Link href={`/artists/${artist.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 flex-shrink-0">
+                {artist.photoUrl ? (
+                  <img
+                    src={artist.photoUrl}
+                    alt={artist.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="font-clash text-sm font-bold text-primary/60">
+                      {initials}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold truncate">{artist.name}</p>
+                {artist.vibeTags && artist.vibeTags.length > 0 && (
+                  <p className="text-xs text-muted-foreground truncate">
+                    {artist.vibeTags.slice(0, 3).join(" · ")}
+                  </p>
+                )}
+              </div>
+            </Link>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+              disabled={unstashMutation.isPending}
+              onClick={() => unstashMutation.mutate({ artistId: artist.id })}
+              aria-label="Remove from Stash"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

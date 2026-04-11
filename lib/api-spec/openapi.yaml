@@ -18,6 +18,8 @@ tags:
     description: Salone music events
   - name: artists
     description: Salone music artists
+  - name: stash
+    description: Personal stash — saved artists
 paths:
   /healthz:
     get:
@@ -471,6 +473,71 @@ paths:
         "404":
           description: Not found
 
+  /stash/artists:
+    get:
+      operationId: listStashedArtists
+      tags: [stash]
+      summary: List artists saved in the user's stash
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: List of stashed artists with full artist details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StashedArtistEntry"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: stashArtist
+      tags: [stash]
+      summary: Save an artist to the user's stash
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StashArtistBody"
+      responses:
+        "201":
+          description: Artist stashed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StashedArtistEntry"
+        "400":
+          description: Bad request
+        "401":
+          description: Unauthorized
+        "409":
+          description: Already stashed
+
+  /stash/artists/{artistId}:
+    delete:
+      operationId: unstashArtist
+      tags: [stash]
+      summary: Remove an artist from the user's stash
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: artistId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
 components:
   securitySchemes:
     clerkAuth:
@@ -843,3 +910,30 @@ components:
           nullable: true
           items:
             $ref: "#/components/schemas/ArtistLink"
+
+    StashedArtistEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Stash entry id
+        artistId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        artist:
+          $ref: "#/components/schemas/Artist"
+      required:
+        - id
+        - artistId
+        - createdAt
+        - artist
+
+    StashArtistBody:
+      type: object
+      properties:
+        artistId:
+          type: integer
+      required:
+        - artistId

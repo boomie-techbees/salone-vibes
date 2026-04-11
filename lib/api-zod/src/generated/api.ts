@@ -386,3 +386,46 @@ export const UpdateSongResponse = zod.object({
 export const DeleteSongParams = zod.object({
   id: zod.coerce.number(),
 });
+
+/**
+ * @summary List artists saved in the user's stash
+ */
+export const ListStashedArtistsResponseItem = zod.object({
+  id: zod.number().describe("Stash entry id"),
+  artistId: zod.number(),
+  createdAt: zod.coerce.date(),
+  artist: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    photoUrl: zod.string().nullish(),
+    bio: zod.string().nullish().describe("AI-generated biography"),
+    vibeTags: zod.array(zod.string()).nullish(),
+    links: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          url: zod.string(),
+        }),
+      )
+      .nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+export const ListStashedArtistsResponse = zod.array(
+  ListStashedArtistsResponseItem,
+);
+
+/**
+ * @summary Save an artist to the user's stash
+ */
+export const StashArtistBody = zod.object({
+  artistId: zod.number(),
+});
+
+/**
+ * @summary Remove an artist from the user's stash
+ */
+export const UnstashArtistParams = zod.object({
+  artistId: zod.coerce.number(),
+});
