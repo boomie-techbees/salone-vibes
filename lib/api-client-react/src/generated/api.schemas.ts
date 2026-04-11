@@ -117,6 +117,36 @@ export interface UpdateSongBody {
   note?: string | null;
 }
 
+export interface ArtistLink {
+  label: string;
+  url: string;
+}
+
+export interface Artist {
+  id: number;
+  name: string;
+  photoUrl?: string | null;
+  /** AI-generated biography */
+  bio?: string | null;
+  vibeTags?: string[] | null;
+  links?: ArtistLink[] | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateArtistBody {
+  /** Artist name — AI will generate the bio and suggest vibe tags */
+  name: string;
+}
+
+export interface UpdateArtistBody {
+  name?: string;
+  photoUrl?: string | null;
+  bio?: string | null;
+  vibeTags?: string[] | null;
+  links?: ArtistLink[] | null;
+}
+
 export type ListEventsParams = {
   /**
    * Filter events by city or country

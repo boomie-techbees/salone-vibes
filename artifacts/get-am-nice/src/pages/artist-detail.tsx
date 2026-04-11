@@ -1,0 +1,537 @@
+import { useState } from "react";
+import { useRoute, Link } from "wouter";
+import { ArrowLeft, Sparkles, Pencil, Check, X, Loader2, Plus, ExternalLink, Tag, Trash2 } from "lucide-react";
+import {
+  useGetArtist,
+  useUpdateArtist,
+  getListArtistsQueryKey,
+  getGetArtistQueryKey,
+} from "@workspace/api-client-react";
+import type { Artist, ArtistLink } from "@workspace/api-client-react";
+import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function ArtistPhoto({ artist }: { artist: Artist }) {
+  const initials = artist.name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div className="relative w-32 h-32 md:w-40 md:h-40 rounded-2xl overflow-hidden bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 flex-shrink-0">
+      {artist.photoUrl ? (
+        <img
+          src={artist.photoUrl}
+          alt={artist.name}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <span className="font-clash text-5xl font-bold text-primary/60">
+            {initials}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BioEditor({
+  artistId,
+  bio,
+}: {
+  artistId: number;
+  bio: string | null | undefined;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(bio ?? "");
+  const { toast } = useToast();
+
+  const update = useUpdateArtist({
+    mutation: {
+      onSuccess: (updated) => {
+        queryClient.setQueryData(getGetArtistQueryKey(artistId), updated);
+        queryClient.invalidateQueries({ queryKey: getListArtistsQueryKey() });
+        setEditing(false);
+        toast({ title: "Bio updated" });
+      },
+      onError: () => {
+        toast({ title: "Failed to update bio", variant: "destructive" });
+      },
+    },
+  });
+
+  function handleSave() {
+    update.mutate({ id: artistId, data: { bio: draft } });
+  }
+
+  function handleCancel() {
+    setDraft(bio ?? "");
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="space-y-2">
+        <Textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          rows={4}
+          className="resize-none text-sm"
+          disabled={update.isPending}
+          autoFocus
+        />
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            className="rounded-full gap-1.5"
+            onClick={handleSave}
+            disabled={update.isPending}
+          >
+            {update.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Check className="w-3.5 h-3.5" />
+            )}
+            Save
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="rounded-full gap-1.5"
+            onClick={handleCancel}
+            disabled={update.isPending}
+          >
+            <X className="w-3.5 h-3.5" />
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-start gap-2">
+        <p className="text-sm text-muted-foreground flex-1 leading-relaxed">
+          {bio || "No bio yet."}
+        </p>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 shrink-0 mt-0.5"
+          onClick={() => {
+            setDraft(bio ?? "");
+            setEditing(true);
+          }}
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground/60 flex items-center gap-1">
+        <Sparkles className="w-3 h-3 text-yellow-500" />
+        AI-generated
+      </p>
+    </div>
+  );
+}
+
+function VibeTagsEditor({
+  artistId,
+  vibeTags,
+}: {
+  artistId: number;
+  vibeTags: string[] | null | undefined;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [tags, setTags] = useState<string[]>(vibeTags ?? []);
+  const [input, setInput] = useState("");
+  const { toast } = useToast();
+
+  const update = useUpdateArtist({
+    mutation: {
+      onSuccess: (updated) => {
+        queryClient.setQueryData(getGetArtistQueryKey(artistId), updated);
+        queryClient.invalidateQueries({ queryKey: getListArtistsQueryKey() });
+        setEditing(false);
+        toast({ title: "Vibe tags updated" });
+      },
+      onError: () => {
+        toast({ title: "Failed to update tags", variant: "destructive" });
+      },
+    },
+  });
+
+  function addTag() {
+    const t = input.trim();
+    if (t && !tags.includes(t)) setTags([...tags, t]);
+    setInput("");
+  }
+
+  function removeTag(tag: string) {
+    setTags(tags.filter((t) => t !== tag));
+  }
+
+  function handleSave() {
+    update.mutate({ id: artistId, data: { vibeTags: tags } });
+  }
+
+  function handleCancel() {
+    setTags(vibeTags ?? []);
+    setInput("");
+    setEditing(false);
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Tag className="w-4 h-4 text-muted-foreground" />
+        <span className="text-sm font-medium">Vibe &amp; Genre</span>
+        {!editing && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6"
+            onClick={() => {
+              setTags(vibeTags ?? []);
+              setEditing(true);
+            }}
+          >
+            <Pencil className="w-3 h-3" />
+          </Button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {(editing ? tags : vibeTags ?? []).map((tag) => (
+          <Badge
+            key={tag}
+            variant="secondary"
+            className="rounded-full text-xs gap-1"
+          >
+            {tag}
+            {editing && (
+              <button
+                onClick={() => removeTag(tag)}
+                className="ml-0.5 hover:text-destructive"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            )}
+          </Badge>
+        ))}
+        {!editing && (!vibeTags || vibeTags.length === 0) && (
+          <span className="text-xs text-muted-foreground">No tags yet.</span>
+        )}
+      </div>
+
+      {editing && (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addTag();
+                }
+              }}
+              placeholder="Add a tag (press Enter)"
+              className="h-8 text-sm"
+              disabled={update.isPending}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={addTag}
+              disabled={!input.trim() || update.isPending}
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="rounded-full gap-1.5"
+              onClick={handleSave}
+              disabled={update.isPending}
+            >
+              {update.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Check className="w-3.5 h-3.5" />
+              )}
+              Save
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="rounded-full"
+              onClick={handleCancel}
+              disabled={update.isPending}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LinksEditor({
+  artistId,
+  links,
+}: {
+  artistId: number;
+  links: ArtistLink[] | null | undefined;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<ArtistLink[]>(links ?? []);
+  const [label, setLabel] = useState("");
+  const [url, setUrl] = useState("");
+  const { toast } = useToast();
+
+  const update = useUpdateArtist({
+    mutation: {
+      onSuccess: (updated) => {
+        queryClient.setQueryData(getGetArtistQueryKey(artistId), updated);
+        queryClient.invalidateQueries({ queryKey: getListArtistsQueryKey() });
+        setEditing(false);
+        toast({ title: "Links updated" });
+      },
+      onError: () => {
+        toast({ title: "Failed to update links", variant: "destructive" });
+      },
+    },
+  });
+
+  function addLink() {
+    if (!label.trim() || !url.trim()) return;
+    const fullUrl = url.startsWith("http") ? url : `https://${url}`;
+    setDraft([...draft, { label: label.trim(), url: fullUrl }]);
+    setLabel("");
+    setUrl("");
+  }
+
+  function removeLink(i: number) {
+    setDraft(draft.filter((_, idx) => idx !== i));
+  }
+
+  function handleSave() {
+    update.mutate({ id: artistId, data: { links: draft } });
+  }
+
+  function handleCancel() {
+    setDraft(links ?? []);
+    setLabel("");
+    setUrl("");
+    setEditing(false);
+  }
+
+  const displayLinks = editing ? draft : (links ?? []);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <ExternalLink className="w-4 h-4 text-muted-foreground" />
+        <span className="text-sm font-medium">Links</span>
+        {!editing && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6"
+            onClick={() => {
+              setDraft(links ?? []);
+              setEditing(true);
+            }}
+          >
+            <Pencil className="w-3 h-3" />
+          </Button>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {displayLinks.map((link, i) => (
+          <div key={i} className="flex items-center gap-2">
+            {editing ? (
+              <>
+                <span className="text-sm flex-1">
+                  <span className="font-medium">{link.label}</span>
+                  <span className="text-muted-foreground ml-2 text-xs truncate">
+                    {link.url}
+                  </span>
+                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 text-destructive"
+                  onClick={() => removeLink(i)}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </>
+            ) : (
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+              >
+                <ExternalLink className="w-3 h-3" />
+                {link.label}
+              </a>
+            )}
+          </div>
+        ))}
+        {displayLinks.length === 0 && !editing && (
+          <span className="text-xs text-muted-foreground">No links yet.</span>
+        )}
+      </div>
+
+      {editing && (
+        <div className="space-y-2 pt-1">
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Label (e.g. Instagram)"
+              className="h-8 text-sm"
+              disabled={update.isPending}
+            />
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="URL"
+              className="h-8 text-sm"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addLink();
+                }
+              }}
+              disabled={update.isPending}
+            />
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={addLink}
+            disabled={!label.trim() || !url.trim() || update.isPending}
+            className="rounded-full gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Link
+          </Button>
+          <div className="flex gap-2 pt-1">
+            <Button
+              size="sm"
+              className="rounded-full gap-1.5"
+              onClick={handleSave}
+              disabled={update.isPending}
+            >
+              {update.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Check className="w-3.5 h-3.5" />
+              )}
+              Save
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="rounded-full"
+              onClick={handleCancel}
+              disabled={update.isPending}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ArtistDetail() {
+  const [, params] = useRoute("/artists/:id");
+  const id = Number(params?.id);
+
+  const { data: artist, isLoading, isError } = useGetArtist(id, {
+    query: { queryKey: getGetArtistQueryKey(id), enabled: !!id && !isNaN(id) },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto">
+        <Skeleton className="h-8 w-32" />
+        <div className="flex gap-5">
+          <Skeleton className="w-32 h-32 md:w-40 md:h-40 rounded-2xl flex-shrink-0" />
+          <div className="flex-1 space-y-3">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !artist) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-destructive mb-4">Artist not found.</p>
+        <Link href="/artists">
+          <Button variant="outline" className="rounded-full">
+            Back to Artists
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <Link href="/artists">
+        <Button variant="ghost" size="sm" className="gap-1.5 -ml-2 rounded-full">
+          <ArrowLeft className="w-4 h-4" />
+          Artists
+        </Button>
+      </Link>
+
+      <div className="flex gap-5 items-start">
+        <ArtistPhoto artist={artist} />
+        <div className="flex-1 min-w-0">
+          <h1 className="font-clash text-3xl md:text-4xl font-bold leading-tight">
+            {artist.name}
+          </h1>
+        </div>
+      </div>
+
+      <div className="space-y-5 divide-y divide-border/40">
+        <div className="pt-1">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            Bio
+          </h2>
+          <BioEditor artistId={artist.id} bio={artist.bio} />
+        </div>
+
+        <div className="pt-4">
+          <VibeTagsEditor artistId={artist.id} vibeTags={artist.vibeTags} />
+        </div>
+
+        <div className="pt-4">
+          <LinksEditor artistId={artist.id} links={artist.links} />
+        </div>
+      </div>
+    </div>
+  );
+}

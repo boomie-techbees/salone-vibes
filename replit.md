@@ -25,7 +25,7 @@ Visual direction: Sierra Leone flag palette (deep green, cobalt blue, white, war
 
 - **Home** — Featured Salone term of the day + upcoming events preview
 - **Dictionary** — AI-powered Krio/Salone word lookup (Claude); save/edit/delete lexicon entries
-- **Artists** — Coming soon placeholder
+- **Artists** — Browsable grid of artist cards; artist detail page with AI-generated bio (editable), vibe/genre tags (editable), and flexible links; add new artists by name (Claude generates bio + tags automatically); seeded with 11 Salone artists
 - **Events** — Browse upcoming Salone music events by location; submit new events
 - **Profile** — User profile, settings, sign out
 
@@ -40,6 +40,7 @@ Visual direction: Sierra Leone flag palette (deep green, cobalt blue, white, war
 - `users` — Clerk-linked user profiles
 - `lexicon_entries` — User's saved dictionary entries
 - `events` — Salone music events (pre-seeded with 5 events)
+- `artists` — Salone music artists (name, photoUrl, bio, vibeTags[], links jsonb); seeded with 11 artists
 
 ## Key Commands
 

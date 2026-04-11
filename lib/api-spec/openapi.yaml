@@ -16,6 +16,8 @@ tags:
     description: Dictionary lookup and saved lexicon
   - name: events
     description: Salone music events
+  - name: artists
+    description: Salone music artists
 paths:
   /healthz:
     get:
@@ -338,6 +340,86 @@ paths:
           description: Bad request
         "401":
           description: Unauthorized
+
+  /artists:
+    get:
+      operationId: listArtists
+      tags: [artists]
+      summary: List all artists in the directory
+      responses:
+        "200":
+          description: List of artists
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Artist"
+    post:
+      operationId: createArtist
+      tags: [artists]
+      summary: Add a new artist (AI generates bio and vibe tags automatically)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateArtistBody"
+      responses:
+        "201":
+          description: Artist created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artist"
+        "400":
+          description: Bad request
+
+  /artists/{id}:
+    get:
+      operationId: getArtist
+      tags: [artists]
+      summary: Get a single artist by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Artist detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artist"
+        "404":
+          description: Not found
+    put:
+      operationId: updateArtist
+      tags: [artists]
+      summary: Update an artist's bio, vibe tags, photo, or links
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateArtistBody"
+      responses:
+        "200":
+          description: Updated artist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artist"
+        "404":
+          description: Not found
 
   /songs/{id}:
     put:
@@ -683,3 +765,81 @@ components:
         note:
           type: string
           nullable: true
+
+    ArtistLink:
+      type: object
+      properties:
+        label:
+          type: string
+        url:
+          type: string
+      required:
+        - label
+        - url
+
+    Artist:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        photoUrl:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+          description: AI-generated biography
+        vibeTags:
+          type: array
+          nullable: true
+          items:
+            type: string
+        links:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/ArtistLink"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+
+    CreateArtistBody:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Artist name — AI will generate the bio and suggest vibe tags
+      required:
+        - name
+
+    UpdateArtistBody:
+      type: object
+      properties:
+        name:
+          type: string
+        photoUrl:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        vibeTags:
+          type: array
+          nullable: true
+          items:
+            type: string
+        links:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/ArtistLink"

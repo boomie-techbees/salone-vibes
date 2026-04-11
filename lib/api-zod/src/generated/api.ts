@@ -262,6 +262,102 @@ export const CreateSongBody = zod.object({
 });
 
 /**
+ * @summary List all artists in the directory
+ */
+export const ListArtistsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  photoUrl: zod.string().nullish(),
+  bio: zod.string().nullish().describe("AI-generated biography"),
+  vibeTags: zod.array(zod.string()).nullish(),
+  links: zod
+    .array(
+      zod.object({
+        label: zod.string(),
+        url: zod.string(),
+      }),
+    )
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListArtistsResponse = zod.array(ListArtistsResponseItem);
+
+/**
+ * @summary Add a new artist (AI generates bio and vibe tags automatically)
+ */
+export const CreateArtistBody = zod.object({
+  name: zod
+    .string()
+    .describe("Artist name — AI will generate the bio and suggest vibe tags"),
+});
+
+/**
+ * @summary Get a single artist by ID
+ */
+export const GetArtistParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetArtistResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  photoUrl: zod.string().nullish(),
+  bio: zod.string().nullish().describe("AI-generated biography"),
+  vibeTags: zod.array(zod.string()).nullish(),
+  links: zod
+    .array(
+      zod.object({
+        label: zod.string(),
+        url: zod.string(),
+      }),
+    )
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update an artist's bio, vibe tags, photo, or links
+ */
+export const UpdateArtistParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateArtistBody = zod.object({
+  name: zod.string().optional(),
+  photoUrl: zod.string().nullish(),
+  bio: zod.string().nullish(),
+  vibeTags: zod.array(zod.string()).nullish(),
+  links: zod
+    .array(
+      zod.object({
+        label: zod.string(),
+        url: zod.string(),
+      }),
+    )
+    .nullish(),
+});
+
+export const UpdateArtistResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  photoUrl: zod.string().nullish(),
+  bio: zod.string().nullish().describe("AI-generated biography"),
+  vibeTags: zod.array(zod.string()).nullish(),
+  links: zod
+    .array(
+      zod.object({
+        label: zod.string(),
+        url: zod.string(),
+      }),
+    )
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary Update a saved song
  */
 export const UpdateSongParams = zod.object({

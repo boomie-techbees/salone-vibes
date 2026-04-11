@@ -10,6 +10,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Home } from "@/pages/home";
 import { SignInPage, SignUpPage } from "@/pages/auth";
 import { Artists } from "@/pages/artists";
+import { ArtistDetail } from "@/pages/artist-detail";
 import { Dictionary } from "@/pages/dictionary";
 import { Events } from "@/pages/events";
 import { ProfilePage } from "@/pages/profile";
@@ -82,6 +83,7 @@ function ClerkProviderWithRoutes() {
               <Route path="/sign-up/*?" component={SignUpPage} />
               <Route path="/dictionary" component={Dictionary} />
               <Route path="/artists" component={Artists} />
+              <Route path="/artists/:id" component={ArtistDetail} />
               <Route path="/events" component={Events} />
               <Route path="/profile" component={ProfilePage} />
               <Route component={NotFound} />

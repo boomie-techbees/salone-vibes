@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./artist";
+export * from "./artistLink";
+export * from "./createArtistBody";
 export * from "./createLexiconEntryBody";
 export * from "./createSongBody";
 export * from "./dictionaryEntry";
@@ -16,6 +19,7 @@ export * from "./lexiconEntry";
 export * from "./listEventsParams";
 export * from "./song";
 export * from "./submitEventBody";
+export * from "./updateArtistBody";
 export * from "./updateLexiconEntryBody";
 export * from "./updateProfileBody";
 export * from "./updateSongBody";
