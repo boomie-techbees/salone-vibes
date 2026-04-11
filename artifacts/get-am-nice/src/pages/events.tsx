@@ -639,15 +639,11 @@ export function Events() {
               </CardContent>
 
               <CardFooter className="p-6 pt-0 mt-auto">
-                {event.ticketUrl ? (
+                {event.ticketUrl && (
                   <Button asChild className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-bold group-hover:shadow-md transition-all">
                     <a href={event.ticketUrl} target="_blank" rel="noopener noreferrer">
                       <Ticket className="w-4 h-4 mr-2" /> Get Tickets
                     </a>
-                  </Button>
-                ) : (
-                  <Button variant="outline" disabled className="w-full">
-                    Tickets Unavailable
                   </Button>
                 )}
               </CardFooter>
