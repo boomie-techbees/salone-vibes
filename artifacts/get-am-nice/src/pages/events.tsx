@@ -387,7 +387,7 @@ function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
                       {isAutoFilled("address") && <AutoBadge />}
                     </FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. New Carrollton, MD  or  Freetown, Sierra Leone" {...field} />
+                      <Input placeholder="e.g. 123 Main St, Freetown, Sierra Leone" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -601,8 +601,17 @@ export function Events() {
                 <div className="flex items-start gap-3 text-muted-foreground">
                   <MapPin className="w-5 h-5 shrink-0 mt-0.5 text-secondary" />
                   <div className="text-sm">
-                    <p className="font-medium text-foreground">{event.venue || "Venue TBA"}</p>
-                    <p>{[event.city, event.country].filter(Boolean).join(", ") || event.location}</p>
+                    {(() => {
+                      const addressLine = [event.city, event.country].filter(Boolean).join(", ") || event.location;
+                      const mapsQuery = [event.venue, event.city, event.country].filter(Boolean).join(", ") || event.venue || event.location;
+                      const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(mapsQuery)}`;
+                      return (
+                        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="group/map">
+                          <p className="font-medium text-foreground group-hover/map:text-primary transition-colors">{event.venue || "Venue TBA"}</p>
+                          <p className="group-hover/map:text-primary transition-colors underline-offset-2 group-hover/map:underline">{addressLine}</p>
+                        </a>
+                      );
+                    })()}
                   </div>
                 </div>
                 {event.description && (
