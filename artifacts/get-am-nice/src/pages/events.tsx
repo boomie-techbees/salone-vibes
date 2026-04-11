@@ -36,6 +36,7 @@ type ExtractedFields = {
   date?: string | null;
   time?: string | null;
   venue?: string | null;
+  street?: string | null;
   city?: string | null;
   country?: string | null;
   location?: string | null;
@@ -260,13 +261,15 @@ function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
       set("eventDate", toDateInputValue(data.date));
       set("ticketUrl", data.ticketUrl);
 
-      const addrClean = [data.city, data.country].filter(Boolean).join(", ") || data.city || "";
+      const line1 = data.street || "";
+      const line2 = [data.city, data.country].filter(Boolean).join(", ");
+      const addrClean = [line1, line2].filter(Boolean).join("\n");
       if (addrClean) {
         form.setValue("address", addrClean, { shouldDirty: true });
         filled.add("address");
       }
 
-      const loc = data.location || addrClean || data.venue || "";
+      const loc = data.location || [data.street, line2].filter(Boolean).join(", ") || data.venue || "";
       if (loc) {
         form.setValue("location", loc, { shouldDirty: true });
         filled.add("location");
@@ -387,7 +390,11 @@ function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
                       {isAutoFilled("address") && <AutoBadge />}
                     </FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. 123 Main St, Freetown, Sierra Leone" {...field} />
+                      <Textarea
+                        placeholder={"123 Main St\nFreetown, Sierra Leone"}
+                        className="resize-none h-16 leading-snug"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -602,14 +609,26 @@ export function Events() {
                   <MapPin className="w-5 h-5 shrink-0 mt-0.5 text-secondary" />
                   <div className="text-sm">
                     {(() => {
-                      const addressLine = [event.city, event.country].filter(Boolean).join(", ") || event.location;
-                      const mapsQuery = [event.venue, event.city, event.country].filter(Boolean).join(", ") || event.venue || event.location;
+                      const storedAddress = (event.city || "").trim();
+                      const addressLines = storedAddress
+                        ? storedAddress.split("\n").map((l) => l.trim()).filter(Boolean)
+                        : [event.location || ""].filter(Boolean);
+                      const mapsQuery = [event.venue, storedAddress.replace(/\n/g, ", "), event.country]
+                        .filter(Boolean).join(", ") || event.location || "";
                       const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(mapsQuery)}`;
-                      return (
-                        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="group/map">
+                      const hasAddress = mapsQuery.length > 0;
+                      const content = (
+                        <>
                           <p className="font-medium text-foreground group-hover/map:text-primary transition-colors">{event.venue || "Venue TBA"}</p>
-                          <p className="group-hover/map:text-primary transition-colors underline-offset-2 group-hover/map:underline">{addressLine}</p>
-                        </a>
+                          {addressLines.map((line, i) => (
+                            <p key={i} className="group-hover/map:text-primary transition-colors underline-offset-2 group-hover/map:underline">{line}</p>
+                          ))}
+                        </>
+                      );
+                      return hasAddress ? (
+                        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="group/map">{content}</a>
+                      ) : (
+                        <div>{content}</div>
                       );
                     })()}
                   </div>
