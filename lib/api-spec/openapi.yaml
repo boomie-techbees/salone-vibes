@@ -235,6 +235,37 @@ paths:
           description: Bad request
 
   /events/{id}:
+    put:
+      operationId: updateEvent
+      tags: [events]
+      summary: Update an existing event (submitter or admin only)
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitEventBody"
+      responses:
+        "200":
+          description: Event updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
     delete:
       operationId: deleteEvent
       tags: [events]

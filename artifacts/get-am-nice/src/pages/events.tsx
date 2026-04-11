@@ -3,9 +3,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { MapPin, Calendar as CalendarIcon, Ticket, Plus, Upload, X, Sparkles, Loader2, Trash2 } from "lucide-react";
+import { MapPin, Calendar as CalendarIcon, Ticket, Plus, Upload, X, Sparkles, Loader2, Trash2, Pencil } from "lucide-react";
 
-import { useListEvents, useSubmitEvent, useDeleteEvent, getListEventsQueryKey } from "@workspace/api-client-react";
+import { useListEvents, useSubmitEvent, useUpdateEvent, useDeleteEvent, getListEventsQueryKey } from "@workspace/api-client-react";
+import type { Event } from "@workspace/api-client-react";
+import { useUser } from "@clerk/react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -225,15 +227,25 @@ function FlyerUpload({
   );
 }
 
-function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.ReactNode; eventToEdit?: Event; onClose?: () => void }) {
+  const isEditing = !!eventToEdit;
+  const [open, setOpen] = useState(isEditing);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const submitMutation = useSubmitEvent();
+  const updateMutation = useUpdateEvent();
 
   const form = useForm<SubmitEventValues>({
     resolver: zodResolver(submitEventSchema),
-    defaultValues: {
+    defaultValues: isEditing ? {
+      title: eventToEdit.title,
+      description: eventToEdit.description ?? "",
+      location: eventToEdit.location,
+      address: eventToEdit.city ?? "",
+      eventDate: String(eventToEdit.eventDate).slice(0, 10),
+      venue: eventToEdit.venue ?? "",
+      ticketUrl: eventToEdit.ticketUrl ?? "",
+    } : {
       title: "",
       description: "",
       location: "",
@@ -285,41 +297,70 @@ function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
     setAutoFilledFields(new Set());
   }, [form]);
 
+  const handleClose = () => {
+    setOpen(false);
+    onClose?.();
+  };
+
   const onSubmit = (data: SubmitEventValues) => {
     const { address, ...rest } = data;
-    submitMutation.mutate(
-      { data: { ...rest, city: address || undefined } },
-      {
-        onSuccess: () => {
-          toast({ title: "Event Submitted!", description: "Your event has been added to the community calendar." });
-          setOpen(false);
-          form.reset();
-          setAutoFilledFields(new Set());
-          queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
-        },
-        onError: () => {
-          toast({ variant: "destructive", title: "Submission Failed", description: "There was a problem submitting your event. Please try again." });
-        },
-      }
-    );
+    const body = { ...rest, city: address || undefined };
+
+    if (isEditing) {
+      updateMutation.mutate(
+        { id: eventToEdit.id, data: body },
+        {
+          onSuccess: () => {
+            toast({ title: "Event Updated!", description: "Your changes have been saved." });
+            queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
+            handleClose();
+          },
+          onError: () => {
+            toast({ variant: "destructive", title: "Update Failed", description: "There was a problem saving your changes. Please try again." });
+          },
+        }
+      );
+    } else {
+      submitMutation.mutate(
+        { data: body },
+        {
+          onSuccess: () => {
+            toast({ title: "Event Submitted!", description: "Your event has been added to the community calendar." });
+            setOpen(false);
+            form.reset();
+            setAutoFilledFields(new Set());
+            queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
+          },
+          onError: () => {
+            toast({ variant: "destructive", title: "Submission Failed", description: "There was a problem submitting your event. Please try again." });
+          },
+        }
+      );
+    }
   };
+
+  const isPending = submitMutation.isPending || updateMutation.isPending;
 
   const isAutoFilled = (field: string) => autoFilledFields.has(field);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button variant="outline" className="border-primary/30 hover:bg-primary/10 text-primary whitespace-nowrap">
-            <Plus className="w-4 h-4 mr-1" /> Add Event
-          </Button>
-        )}
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); else setOpen(true); }}>
+      {!isEditing && (
+        <DialogTrigger asChild>
+          {trigger || (
+            <Button variant="outline" className="border-primary/30 hover:bg-primary/10 text-primary whitespace-nowrap">
+              <Plus className="w-4 h-4 mr-1" /> Add Event
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-clash text-2xl">Submit an Event</DialogTitle>
+          <DialogTitle className="font-clash text-2xl">{isEditing ? "Edit Event" : "Submit an Event"}</DialogTitle>
           <DialogDescription>
-            Know about a Salone event? Upload a flyer to auto-fill the details, or fill in the form manually.
+            {isEditing
+              ? "Update the details below. Changes are saved immediately."
+              : "Know about a Salone event? Upload a flyer to auto-fill the details, or fill in the form manually."}
           </DialogDescription>
         </DialogHeader>
 
@@ -457,18 +498,18 @@ function SubmitEventDialog({ trigger }: { trigger?: React.ReactNode }) {
               />
 
               <div className="pt-2 flex justify-end gap-3">
-                <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                <Button type="button" variant="ghost" onClick={handleClose}>
                   Cancel
                 </Button>
                 <Button
                   type="submit"
-                  disabled={submitMutation.isPending}
+                  disabled={isPending}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
                 >
-                  {submitMutation.isPending ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting…</>
+                  {isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isEditing ? "Saving…" : "Submitting…"}</>
                   ) : (
-                    "Submit Event"
+                    isEditing ? "Save Changes" : "Submit Event"
                   )}
                 </Button>
               </div>
@@ -486,6 +527,25 @@ function AutoBadge() {
       <Sparkles className="w-2.5 h-2.5" />
       Auto-filled
     </Badge>
+  );
+}
+
+function EditEventButton({ event }: { event: Event }) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all"
+        onClick={() => setEditing(true)}
+      >
+        <Pencil className="w-4 h-4" />
+      </Button>
+      {editing && (
+        <SubmitEventDialog eventToEdit={event} onClose={() => setEditing(false)} />
+      )}
+    </>
   );
 }
 
@@ -539,6 +599,9 @@ function DeleteEventButton({ eventId, eventTitle }: { eventId: number; eventTitl
 }
 
 export function Events() {
+  const { user } = useUser();
+  const currentClerkId = user?.id ?? null;
+  const isAdminUser = user?.publicMetadata?.role === "admin";
   const [locationFilter, setLocationFilter] = useState("");
   const [debouncedFilter, setDebouncedFilter] = useState("");
 
@@ -598,7 +661,10 @@ export function Events() {
                       {event.title}
                     </h3>
                   </div>
-                  <div className="shrink-0 pt-0.5">
+                  <div className="shrink-0 pt-0.5 flex gap-1">
+                    {(isAdminUser || (currentClerkId && currentClerkId === event.submittedBy)) && (
+                      <EditEventButton event={event} />
+                    )}
                     <DeleteEventButton eventId={event.id} eventTitle={event.title} />
                   </div>
                 </div>

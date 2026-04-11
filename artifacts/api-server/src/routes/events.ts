@@ -1,10 +1,17 @@
 import { Router } from "express";
 import Anthropic from "@anthropic-ai/sdk";
+import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { eventsTable } from "@workspace/db";
 import { gte, or, ilike, and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { SubmitEventBody, ListEventsQueryParams } from "@workspace/api-zod";
+
+const ADMIN_IDS = (process.env.ADMIN_CLERK_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+
+function isAdmin(clerkUserId: string | null | undefined): boolean {
+  return !!clerkUserId && ADMIN_IDS.includes(clerkUserId);
+}
 
 const ExtractFlyerBody = z.object({
   imageBase64: z.string().min(1),
@@ -159,6 +166,9 @@ router.post("/events", async (req, res) => {
     return res.status(400).json({ error: parseResult.error.issues });
   }
 
+  const auth = getAuth(req);
+  const clerkUserId = auth?.userId ?? null;
+
   const data = parseResult.data;
   const [event] = await db
     .insert(eventsTable)
@@ -171,12 +181,63 @@ router.post("/events", async (req, res) => {
       eventDate: new Date(data.eventDate),
       venue: data.venue ?? null,
       ticketUrl: data.ticketUrl ?? null,
-      submittedBy: data.submittedBy ?? null,
+      submittedBy: clerkUserId,
       approved: true,
     })
     .returning();
 
   return res.status(201).json(event);
+});
+
+router.put("/events/:id", async (req, res) => {
+  const auth = getAuth(req);
+  const clerkUserId = auth?.userId ?? null;
+  if (!clerkUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: "Invalid event id" });
+  }
+
+  const parseResult = SubmitEventBody.safeParse(req.body);
+  if (!parseResult.success) {
+    return res.status(400).json({ error: parseResult.error.issues });
+  }
+
+  const [existing] = await db
+    .select()
+    .from(eventsTable)
+    .where(eq(eventsTable.id, id))
+    .limit(1);
+
+  if (!existing) {
+    return res.status(404).json({ error: "Event not found" });
+  }
+
+  const canEdit = isAdmin(clerkUserId) || existing.submittedBy === clerkUserId;
+  if (!canEdit) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const data = parseResult.data;
+  const [updated] = await db
+    .update(eventsTable)
+    .set({
+      title: data.title,
+      description: data.description ?? null,
+      location: data.location,
+      city: data.city ?? null,
+      country: data.country ?? null,
+      eventDate: new Date(data.eventDate),
+      venue: data.venue ?? null,
+      ticketUrl: data.ticketUrl ?? null,
+    })
+    .where(eq(eventsTable.id, id))
+    .returning();
+
+  return res.json(updated);
 });
 
 router.delete("/events/:id", async (req, res) => {

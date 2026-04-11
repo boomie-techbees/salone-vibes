@@ -953,6 +953,93 @@ export const useSubmitEvent = <
 };
 
 /**
+ * @summary Update an existing event (submitter or admin only)
+ */
+export const getUpdateEventUrl = (id: number) => {
+  return `/api/events/${id}`;
+};
+
+export const updateEvent = async (
+  id: number,
+  submitEventBody: SubmitEventBody,
+  options?: RequestInit,
+): Promise<Event> => {
+  return customFetch<Event>(getUpdateEventUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(submitEventBody),
+  });
+};
+
+export const getUpdateEventMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateEvent>>,
+    TError,
+    { id: number; data: BodyType<SubmitEventBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateEvent>>,
+  TError,
+  { id: number; data: BodyType<SubmitEventBody> },
+  TContext
+> => {
+  const mutationKey = ["updateEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateEvent>>,
+    { id: number; data: BodyType<SubmitEventBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateEvent(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateEvent>>
+>;
+export type UpdateEventMutationBody = BodyType<SubmitEventBody>;
+export type UpdateEventMutationError = ErrorType<void>;
+
+/**
+ * @summary Update an existing event (submitter or admin only)
+ */
+export const useUpdateEvent = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateEvent>>,
+    TError,
+    { id: number; data: BodyType<SubmitEventBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateEvent>>,
+  TError,
+  { id: number; data: BodyType<SubmitEventBody> },
+  TContext
+> => {
+  return useMutation(getUpdateEventMutationOptions(options));
+};
+
+/**
  * @summary Delete an event by ID
  */
 export const getDeleteEventUrl = (id: number) => {

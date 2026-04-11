@@ -177,6 +177,40 @@ export const SubmitEventBody = zod.object({
 });
 
 /**
+ * @summary Update an existing event (submitter or admin only)
+ */
+export const UpdateEventParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateEventBody = zod.object({
+  title: zod.string(),
+  description: zod.string().nullish(),
+  location: zod.string(),
+  city: zod.string().nullish(),
+  country: zod.string().nullish(),
+  eventDate: zod.coerce.date(),
+  venue: zod.string().nullish(),
+  ticketUrl: zod.string().nullish(),
+  submittedBy: zod.string().nullish(),
+});
+
+export const UpdateEventResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  location: zod.string(),
+  city: zod.string().nullish(),
+  country: zod.string().nullish(),
+  eventDate: zod.coerce.date(),
+  venue: zod.string().nullish(),
+  ticketUrl: zod.string().nullish(),
+  submittedBy: zod.string().nullish(),
+  approved: zod.boolean(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
  * @summary Delete an event by ID
  */
 export const DeleteEventParams = zod.object({
