@@ -60,10 +60,6 @@ export function Dictionary() {
       { data: { ...result, notes: "" } },
       {
         onSuccess: () => {
-          toast({
-            title: "Saved to Lexicon",
-            description: `"${result.term}" is in your Stash.`,
-          });
           queryClient.invalidateQueries({ queryKey: getListLexiconQueryKey() });
         },
         onError: () => {
