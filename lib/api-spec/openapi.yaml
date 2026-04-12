@@ -73,6 +73,31 @@ paths:
         "401":
           description: Unauthorized
 
+  /profile/stash-section-order:
+    put:
+      operationId: updateStashSectionOrder
+      tags: [profile]
+      summary: Persist order of My Stash sections (drag-and-drop)
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStashSectionOrderBody"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          description: Bad request
+        "401":
+          description: Unauthorized
+
   /dictionary/lookup:
     post:
       operationId: dictionaryLookup
@@ -565,6 +590,13 @@ components:
         email:
           type: string
           nullable: true
+        stashSectionOrder:
+          type: array
+          nullable: true
+          description: Order of My Stash sections; each value appears once
+          items:
+            type: string
+            enum: [lexicon, artists, songs]
         createdAt:
           type: string
           format: date-time
@@ -572,6 +604,19 @@ components:
         - id
         - clerkUserId
         - createdAt
+
+    UpdateStashSectionOrderBody:
+      type: object
+      required: [order]
+      properties:
+        order:
+          type: array
+          minItems: 3
+          maxItems: 3
+          uniqueItems: true
+          items:
+            type: string
+            enum: [lexicon, artists, songs]
 
     UpdateProfileBody:
       type: object

@@ -3,7 +3,7 @@ import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { UpdateProfileBody } from "@workspace/api-zod";
+import { UpdateProfileBody, UpdateStashSectionOrderBody } from "@workspace/api-zod";
 
 const router = Router();
 
@@ -36,6 +36,37 @@ router.get("/profile", async (req, res) => {
   const email = auth?.sessionClaims?.email as string | undefined;
   const user = await getOrCreateUser(clerkUserId, email);
   return res.json(user);
+});
+
+router.put("/profile/stash-section-order", async (req, res) => {
+  const auth = getAuth(req);
+  const clerkUserId = auth?.sessionClaims?.userId as string | undefined || auth?.userId;
+  if (!clerkUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const parseResult = UpdateStashSectionOrderBody.safeParse(req.body);
+  if (!parseResult.success) {
+    return res.status(400).json({ error: parseResult.error.issues });
+  }
+
+  if (new Set(parseResult.data.order).size !== 3) {
+    return res.status(400).json({
+      error: "order must list each section exactly once",
+    });
+  }
+
+  const user = await getOrCreateUser(clerkUserId);
+  const [updated] = await db
+    .update(usersTable)
+    .set({
+      stashSectionOrder: parseResult.data.order,
+      updatedAt: new Date(),
+    })
+    .where(eq(usersTable.id, user.id))
+    .returning();
+
+  return res.json(updated);
 });
 
 router.put("/profile", async (req, res) => {

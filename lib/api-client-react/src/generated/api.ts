@@ -35,6 +35,7 @@ import type {
   UpdateLexiconEntryBody,
   UpdateProfileBody,
   UpdateSongBody,
+  UpdateStashSectionOrderBody,
   UserProfile,
 } from "./api.schemas";
 
@@ -282,6 +283,93 @@ export const useUpdateProfile = <
   TContext
 > => {
   return useMutation(getUpdateProfileMutationOptions(options));
+};
+
+/**
+ * @summary Persist order of My Stash sections (drag-and-drop)
+ */
+export const getUpdateStashSectionOrderUrl = () => {
+  return `/api/profile/stash-section-order`;
+};
+
+export const updateStashSectionOrder = async (
+  updateStashSectionOrderBody: UpdateStashSectionOrderBody,
+  options?: RequestInit,
+): Promise<UserProfile> => {
+  return customFetch<UserProfile>(getUpdateStashSectionOrderUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateStashSectionOrderBody),
+  });
+};
+
+export const getUpdateStashSectionOrderMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateStashSectionOrder>>,
+    TError,
+    { data: BodyType<UpdateStashSectionOrderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateStashSectionOrder>>,
+  TError,
+  { data: BodyType<UpdateStashSectionOrderBody> },
+  TContext
+> => {
+  const mutationKey = ["updateStashSectionOrder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateStashSectionOrder>>,
+    { data: BodyType<UpdateStashSectionOrderBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateStashSectionOrder(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateStashSectionOrderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateStashSectionOrder>>
+>;
+export type UpdateStashSectionOrderMutationBody =
+  BodyType<UpdateStashSectionOrderBody>;
+export type UpdateStashSectionOrderMutationError = ErrorType<void>;
+
+/**
+ * @summary Persist order of My Stash sections (drag-and-drop)
+ */
+export const useUpdateStashSectionOrder = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateStashSectionOrder>>,
+    TError,
+    { data: BodyType<UpdateStashSectionOrderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateStashSectionOrder>>,
+  TError,
+  { data: BodyType<UpdateStashSectionOrderBody> },
+  TContext
+> => {
+  return useMutation(getUpdateStashSectionOrderMutationOptions(options));
 };
 
 /**

@@ -9,12 +9,40 @@ export interface HealthStatus {
   status: string;
 }
 
+export type UserProfileStashSectionOrderItem =
+  (typeof UserProfileStashSectionOrderItem)[keyof typeof UserProfileStashSectionOrderItem];
+
+export const UserProfileStashSectionOrderItem = {
+  lexicon: "lexicon",
+  artists: "artists",
+  songs: "songs",
+} as const;
+
 export interface UserProfile {
   id: number;
   clerkUserId: string;
   displayName?: string | null;
   email?: string | null;
+  /** Order of My Stash sections; each value appears once */
+  stashSectionOrder?: UserProfileStashSectionOrderItem[] | null;
   createdAt: string;
+}
+
+export type UpdateStashSectionOrderBodyOrderItem =
+  (typeof UpdateStashSectionOrderBodyOrderItem)[keyof typeof UpdateStashSectionOrderBodyOrderItem];
+
+export const UpdateStashSectionOrderBodyOrderItem = {
+  lexicon: "lexicon",
+  artists: "artists",
+  songs: "songs",
+} as const;
+
+export interface UpdateStashSectionOrderBody {
+  /**
+   * @minItems 3
+   * @maxItems 3
+   */
+  order: UpdateStashSectionOrderBodyOrderItem[];
 }
 
 export interface UpdateProfileBody {

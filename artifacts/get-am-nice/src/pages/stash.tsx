@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ElementType, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -16,7 +16,26 @@ import {
   Star,
   Mic2,
   Lock,
+  GripVertical,
 } from "lucide-react";
+
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import {
   useListLexicon,
@@ -31,10 +50,18 @@ import {
   useListStashedArtists,
   useUnstashArtist,
   getListStashedArtistsQueryKey,
+  useGetProfile,
+  getGetProfileQueryKey,
+  useUpdateStashSectionOrder,
 } from "@workspace/api-client-react";
-import type { LexiconEntry, Song } from "@workspace/api-client-react";
+import type {
+  LexiconEntry,
+  Song,
+  UserProfileStashSectionOrderItem,
+} from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -739,20 +766,41 @@ function MyArtists() {
 
 // ─── Section wrapper ─────────────────────────────────────────────────────────
 
+const DEFAULT_STASH_SECTION_ORDER: UserProfileStashSectionOrderItem[] = [
+  "lexicon",
+  "artists",
+  "songs",
+];
+
+function normalizeStashSectionOrder(
+  raw: UserProfileStashSectionOrderItem[] | null | undefined,
+): UserProfileStashSectionOrderItem[] {
+  if (!raw || raw.length !== 3) return [...DEFAULT_STASH_SECTION_ORDER];
+  const set = new Set(raw);
+  if (set.size !== 3) return [...DEFAULT_STASH_SECTION_ORDER];
+  for (const v of DEFAULT_STASH_SECTION_ORDER) {
+    if (!set.has(v)) return [...DEFAULT_STASH_SECTION_ORDER];
+  }
+  return raw;
+}
+
 function Section({
   icon: Icon,
   title,
   count,
   children,
+  dragHandle,
 }: {
-  icon: React.ElementType;
+  icon: ElementType;
   title: string;
   count?: number;
-  children: React.ReactNode;
+  children: ReactNode;
+  dragHandle?: ReactNode;
 }) {
   return (
     <section className="space-y-4">
       <div className="flex items-center gap-2">
+        {dragHandle}
         <Icon className="w-5 h-5 text-primary" />
         <h2 className="font-clash text-xl font-bold">{title}</h2>
         {count !== undefined && (
@@ -763,6 +811,61 @@ function Section({
       </div>
       {children}
     </section>
+  );
+}
+
+function SortableStashSection({
+  id,
+  icon,
+  title,
+  count,
+  children,
+}: {
+  id: UserProfileStashSectionOrderItem;
+  icon: ElementType;
+  title: string;
+  count?: number;
+  children: ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(isDragging && "opacity-60")}
+    >
+      <Section
+        icon={icon}
+        title={title}
+        count={count}
+        dragHandle={
+          <button
+            type="button"
+            className="touch-none shrink-0 cursor-grab rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing"
+            aria-label="Drag to reorder section"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-5 w-5" />
+          </button>
+        }
+      >
+        {children}
+      </Section>
+    </div>
   );
 }
 
@@ -796,12 +899,50 @@ function SignInPrompt() {
 // ─── Stash page ──────────────────────────────────────────────────────────────
 
 function StashContent() {
+  const { toast } = useToast();
+  const { data: profile } = useGetProfile({
+    query: { queryKey: getGetProfileQueryKey() },
+  });
   const { data: lexiconEntries } = useListLexicon({
     query: { queryKey: getListLexiconQueryKey() },
   });
   const { data: songs } = useListSongs({
     query: { queryKey: getListSongsQueryKey() },
   });
+
+  const order = normalizeStashSectionOrder(profile?.stashSectionOrder ?? null);
+
+  const updateSectionOrder = useUpdateStashSectionOrder({
+    mutation: {
+      onSuccess: (user) => {
+        queryClient.setQueryData(getGetProfileQueryKey(), user);
+      },
+      onError: () => {
+        toast({
+          variant: "destructive",
+          title: "Couldn't save section order",
+          description: "Try again in a moment.",
+        });
+      },
+    },
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = order.indexOf(active.id as UserProfileStashSectionOrderItem);
+    const newIndex = order.indexOf(over.id as UserProfileStashSectionOrderItem);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const newOrder = arrayMove(order, oldIndex, newIndex);
+    updateSectionOrder.mutate({ data: { order: newOrder } });
+  }
 
   return (
     <div className="space-y-10 pb-10 max-w-4xl mx-auto">
@@ -812,30 +953,55 @@ function StashContent() {
             My Stash
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Your saved words, songs, and artists
+            Your saved words, artists, and songs
+          </p>
+          <p className="text-muted-foreground text-xs mt-1.5">
+            Drag the grip beside a heading to reorder sections. Order is saved
+            to your account.
           </p>
         </div>
       </div>
 
-      <Section
-        icon={BookOpen}
-        title="My Lexicon"
-        count={lexiconEntries?.length}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
       >
-        <MyLexicon />
-      </Section>
-
-      <div className="border-t border-border/40" />
-
-      <Section icon={Star} title="Songs I Love" count={songs?.length}>
-        <SongsILove />
-      </Section>
-
-      <div className="border-t border-border/40" />
-
-      <Section icon={Mic2} title="My Artists">
-        <MyArtists />
-      </Section>
+        <SortableContext items={order} strategy={verticalListSortingStrategy}>
+          {order.map((sectionId, index) => (
+            <div
+              key={sectionId}
+              className={cn(index > 0 && "border-t border-border/40 pt-10")}
+            >
+              {sectionId === "lexicon" && (
+                <SortableStashSection
+                  id={sectionId}
+                  icon={BookOpen}
+                  title="My Lexicon"
+                  count={lexiconEntries?.length}
+                >
+                  <MyLexicon />
+                </SortableStashSection>
+              )}
+              {sectionId === "artists" && (
+                <SortableStashSection id={sectionId} icon={Mic2} title="My Artists">
+                  <MyArtists />
+                </SortableStashSection>
+              )}
+              {sectionId === "songs" && (
+                <SortableStashSection
+                  id={sectionId}
+                  icon={Star}
+                  title="Songs I Love"
+                  count={songs?.length}
+                >
+                  <SongsILove />
+                </SortableStashSection>
+              )}
+            </div>
+          ))}
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }

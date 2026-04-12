@@ -23,6 +23,10 @@ export const GetProfileResponse = zod.object({
   clerkUserId: zod.string(),
   displayName: zod.string().nullish(),
   email: zod.string().nullish(),
+  stashSectionOrder: zod
+    .array(zod.enum(["lexicon", "artists", "songs"]))
+    .nullish()
+    .describe("Order of My Stash sections; each value appears once"),
   createdAt: zod.coerce.date(),
 });
 
@@ -38,6 +42,35 @@ export const UpdateProfileResponse = zod.object({
   clerkUserId: zod.string(),
   displayName: zod.string().nullish(),
   email: zod.string().nullish(),
+  stashSectionOrder: zod
+    .array(zod.enum(["lexicon", "artists", "songs"]))
+    .nullish()
+    .describe("Order of My Stash sections; each value appears once"),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Persist order of My Stash sections (drag-and-drop)
+ */
+export const updateStashSectionOrderBodyOrderMin = 3;
+export const updateStashSectionOrderBodyOrderMax = 3;
+
+export const UpdateStashSectionOrderBody = zod.object({
+  order: zod
+    .array(zod.enum(["lexicon", "artists", "songs"]))
+    .min(updateStashSectionOrderBodyOrderMin)
+    .max(updateStashSectionOrderBodyOrderMax),
+});
+
+export const UpdateStashSectionOrderResponse = zod.object({
+  id: zod.number(),
+  clerkUserId: zod.string(),
+  displayName: zod.string().nullish(),
+  email: zod.string().nullish(),
+  stashSectionOrder: zod
+    .array(zod.enum(["lexicon", "artists", "songs"]))
+    .nullish()
+    .describe("Order of My Stash sections; each value appears once"),
   createdAt: zod.coerce.date(),
 });
 

@@ -30,7 +30,7 @@ Everything below is **implemented** in the repo unless marked *planned*.
 | Area | What’s live |
 | --- | --- |
 | **Save to Lexicon** | From dictionary results, save entries into *your* lexicon (after sign-in). |
-| **My Stash** | One hub: **My Lexicon** (edit notes, fix AI text, delete entries), **Songs I Love** (CRUD + notes), **My Artists** (stashed artists). Signed-out visitors see a **sign-in / sign-up** prompt (feature is not hidden). |
+| **My Stash** | One hub: **My Lexicon** (edit notes, fix AI text, delete entries), **My Artists** (stashed artists), **Songs I Love** (CRUD + notes). **Drag-and-drop** section order is **saved on your account** (not local-only). Signed-out visitors see a **sign-in / sign-up** prompt (feature is not hidden). |
 | **Save artist to Stash** | On artist detail, stash / unstash. Signed-out users get a **sign-in** CTA. |
 | **Submit an event** | Manual form + optional **flyer upload**; Claude extracts fields to pre-fill the form. **Sign-in required**; signed-out users see **sign-in** CTAs instead of the submit dialog. Submitters can edit/delete **their** events. |
 | **Profile / Settings** | Display name, email/method summary, sign out. Signed-out visitors see a **sign-in** prompt. |
@@ -96,7 +96,7 @@ Core loop is live end-to-end: browse culture anonymously, sign in to personalize
 - Dictionary lookup + personal lexicon + AI lookup pipeline  
 - Events listing, filter, submit, flyer extraction, submitter/admin edit & delete  
 - Artist directory, detail pages, stash artist, admin-only artist CRUD (UI + API)  
-- My Stash (lexicon, songs, artists)  
+- My Stash (lexicon, artists, songs) with **persisted drag-and-drop section order**  
 - Home experience (word of day, events preview)  
 - Profile / settings  
 - Clerk authentication and **public vs authenticated** UX (sign-in prompts where needed)  
@@ -146,7 +146,7 @@ Famous, Emmerson, Rozzy Sokota, Arkman, Dallas Bantan, Camouflage, King Boss LA,
    - `ADMIN_CLERK_IDS` — optional comma-separated Clerk user IDs for admin fallback  
    - `FRONTEND_STATIC_DIR` — optional; use when production static files are not in the default layout  
 
-3. **Run DB migrations** as documented in `lib/db` (if applicable to your setup).
+3. **Apply database schema** when `lib/db` changes (e.g. new columns): from repo root, with `DATABASE_URL` / `DATABASE_PUBLIC_URL` set, run `pnpm --filter @workspace/db run push` (Drizzle Kit push).
 
 4. **Dev (API + Vite together)** from repo root:
 
