@@ -25,8 +25,8 @@ export function Navbar() {
     <nav className="fixed top-0 left-0 right-0 h-16 bg-primary text-primary-foreground z-50 flex items-center justify-between px-3 md:px-8 shadow-md">
       {/* Logo */}
       <Link href="/" className="font-clash font-bold text-xl tracking-tight shrink-0 flex items-center gap-2">
-        <span className="hidden md:inline">Get Am Nice</span>
-        <span className="md:hidden">GAN</span>
+        <span className="hidden md:inline">Salone Vibes</span>
+        <span className="md:hidden">SV</span>
         <span className="text-[10px] font-sans font-semibold tracking-widest uppercase bg-primary-foreground/15 text-primary-foreground/70 border border-primary-foreground/20 rounded px-1.5 py-0.5 leading-none">
           Beta
         </span>

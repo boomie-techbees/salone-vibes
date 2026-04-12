@@ -21,7 +21,7 @@ export function Home() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
               <Link href="/sign-up" className="w-full sm:w-auto px-8 py-3 bg-accent text-accent-foreground font-bold rounded-full hover:bg-accent/90 transition-colors shadow-lg text-lg">
-                Join the Community
+                Build Your Stash
               </Link>
               <Link href="/dictionary" className="w-full sm:w-auto px-8 py-3 bg-primary-foreground/10 text-primary-foreground font-bold rounded-full hover:bg-primary-foreground/20 transition-colors border-2 border-primary-foreground/20 text-lg">
                 Browse Dictionary

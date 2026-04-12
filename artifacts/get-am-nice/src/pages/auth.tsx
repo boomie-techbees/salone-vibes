@@ -33,7 +33,7 @@ export function SignUpPage() {
     <div className="flex justify-center items-center min-h-[calc(100vh-8rem)] py-8 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="font-clash text-4xl font-bold text-primary mb-2">Join Get Am Nice</h1>
+          <h1 className="font-clash text-4xl font-bold text-primary mb-2">Join Salone Vibes</h1>
           <p className="text-muted-foreground">Create an account to save words to your lexicon.</p>
         </div>
         <SignUp 
