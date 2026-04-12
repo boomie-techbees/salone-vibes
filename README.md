@@ -1,27 +1,56 @@
-# Get Am Nice (Salone Vibes)
+# Salone Vibes (Get Am Nice)
 
 **Your cultural plug to Salone music, slang, and lifestyle.**
 
-Get Am Nice is a mobile-first web app for fans of Sierra Leonean (Salone) music. Look up Krio words and phrases, build your personal lexicon, discover live events, and explore artists. All in one place.
+Salone Vibes is a mobile-first web app for fans of Sierra Leonean (Salone) music. Look up Krio words and phrases, build your personal lexicon, discover live events, and explore artists—all in one place.
 
-Built because no existing platform serves this community well, and because Famous dropped "One Life" and someone needed to know what *fen am* meant. 🎵
+Built because no existing platform serves this community well, and because Famous dropped "One Life" and someone needed to know what *fen am* meant.
 
-🌐 **Live app:** *(coming soon)*
-📖 **Full story:** *(link to blog post when published)*
+**Live app:** Deploy on **Railway**; add your public URL here when you have one.
+
+**Full story:** *(link to blog post when published)*
 
 ---
 
 ## Features
 
-- **Salone Vibe Dictionary:** Look up Krio/Salone words and phrases; get AI-powered definitions, cultural context, pronunciation, and usage examples. Lookup is public — no login required.
-- **Personal Lexicon (My Stash):** Save and edit your own dictionary entries; correct AI errors and add personal notes. Login required to save.
-- **Live Events:** Browse upcoming Salone music events by location; submit events manually or upload a flyer and let Claude extract the details automatically.
-- **Artist Explorer:** Browse 12 seeded Salone artists with AI-generated bios, vibe tags, and flexible links. Add new artists by name and Claude generates the bio automatically.
-- **Songs I Love (My Stash):** Add the songs that brought you to Salone music, with personal notes.
-- **My Artists (My Stash):** Save artists you follow to your personal collection.
-- **My Stash:** Personal hub consolidating your saved words, songs, and artists in one place.
-- **Google Authentication:** Sign in with Google via Clerk; your data follows you across devices.
-- **PWA-enabled:** Install on your phone home screen for quick lookups mid-listen.
+Everything below is **implemented** in the repo unless marked *planned*.
+
+### Culture & discovery (mostly public)
+
+| Area | What’s live |
+| --- | --- |
+| **Home** | Word of the Day, upcoming events preview, links into dictionary / events / artists. Signed-out hero (“Get Am Nice.”); signed-in welcome strip. |
+| **Salone Dictionary** | AI-assisted lookup (definition, cultural context, pronunciation, usage examples). **Lookup is public** (no account). |
+| **Events** | Upcoming events grid, filter by location text. Event cards with venue, address/maps link, description, ticket link. **Browsing is public.** |
+| **Artists** | Grid of artists (seeded directory + admin-added). **Artist detail** page: photo, bio, vibe tags, outbound links. **Browsing and detail are public.** |
+
+### Personalization (sign-in required)
+
+| Area | What’s live |
+| --- | --- |
+| **Save to Lexicon** | From dictionary results, save entries into *your* lexicon (after sign-in). |
+| **My Stash** | One hub: **My Lexicon** (edit notes, fix AI text, delete entries), **Songs I Love** (CRUD + notes), **My Artists** (stashed artists). Signed-out visitors see a **sign-in / sign-up** prompt (feature is not hidden). |
+| **Save artist to Stash** | On artist detail, stash / unstash. Signed-out users get a **sign-in** CTA. |
+| **Submit an event** | Manual form + optional **flyer upload**; Claude extracts fields to pre-fill the form. **Sign-in required**; signed-out users see **sign-in** CTAs instead of the submit dialog. Submitters can edit/delete **their** events. |
+| **Profile / Settings** | Display name, email/method summary, sign out. Signed-out visitors see a **sign-in** prompt. |
+
+### Administration (Clerk role)
+
+Users with **`publicMetadata.role === "admin"`** in Clerk (and optional server **`ADMIN_CLERK_IDS`** fallback) can:
+
+- **Add Artist** (AI-generated bio + vibe tags from name).
+- **Edit** artist bio, vibe tags, and links on the artist detail page.
+
+Non-admins see read-only artist fields. The API enforces the same rules for create/update artist routes.
+
+### Platform & quality
+
+- **Auth:** Clerk (e.g. Google OAuth—configure providers in Clerk).
+- **AI:** Anthropic Claude (`claude-sonnet-4-6`) for dictionary, artist copy, event flyer extraction.
+- **Data:** PostgreSQL + Drizzle ORM; API validated with **Zod** (from **`@workspace/api-spec`** codegen).
+- **Installable:** Web app **manifest** (`standalone`) for home-screen style launch; not a full offline service-worker PWA unless you add one later.
+- **AI disclaimers:** UI notes on generated content where relevant (dictionary, artists, events, etc.).
 
 ---
 
@@ -29,13 +58,14 @@ Built because no existing platform serves this community well, and because Famou
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | React + Vite (mobile-first) |
-| Auth | Clerk (Google OAuth) |
-| Backend | Node.js / Express |
-| Database | PostgreSQL |
-| AI features | Anthropic Claude API (claude-sonnet-4-6) |
-| Hosting | Railway |
-| Validation | Zod |
+| Monorepo | **pnpm** workspaces (`artifacts/`, `lib/`) |
+| Frontend | React, **Vite**, **Wouter**, **TanStack Query**, Tailwind |
+| Auth | **Clerk** (React + Express middleware) |
+| Backend | **Node.js**, **Express** (bundled with esbuild) |
+| Database | **PostgreSQL**, **Drizzle** (`lib/db`) |
+| API contracts | **OpenAPI / Orval** (`lib/api-spec`), runtime schemas **`lib/api-zod`** |
+| AI | **Anthropic** Claude API |
+| Hosting | **Railway** (typical: `pnpm run build`, then API `pnpm start`, `NODE_ENV=production`) |
 
 ---
 
@@ -45,51 +75,102 @@ Krio is a creole language with its own grammar, borrowings, and cultural referen
 
 ---
 
-## Why Claude API for the dictionary?
+## Why Claude for the dictionary?
 
-General-purpose AI handles Krio slang inconsistently. Claude was chosen after testing showed better cultural context and nuance for Sierra Leonean music specifically. Manual edit capability is built in as a safety net. AI alone is not enough for heavy slang, and human confirmation matters.
-
----
-
-## Events Data
-
-Salone music events are primarily promoted through Instagram and community networks, not Ticketmaster or Eventbrite. Rather than build on a fragile scraping foundation, Get Am Nice uses a community submission form as the primary data source. Promoters can also upload a flyer and Claude extracts the event details automatically.
+General-purpose AI handles Krio slang inconsistently. Claude was chosen after testing showed better cultural context and nuance for Sierra Leonean music. Manual edit capability in **My Lexicon** is the safety net. AI alone is not enough for heavy slang, and human confirmation matters.
 
 ---
 
-## Project Status
+## Events data
 
-This app is in active development, built in a single evening session as part of the Building Out Loud with AI series.
-
-**Currently live:**
-- Salone Vibe Dictionary with personal lexicon
-- Events listing with flyer upload and auto-extraction
-- Artist explorer with 12 seeded artists and AI-generated bios
-- My Stash (saved words, songs, artists)
-- Google authentication
-- PWA support
-
-**In progress (Tier 2):**
-- Event detail pages
-- Artist/event connections
-- YouTube playback integration
-- Community interpretations
-
-**Planned (Tier 4 / long term):**
-- Whole song translations (collaborative, human-confirmed)
-- Timestamp-linked lyrics
+Salone music events are often promoted on Instagram and in community networks, not only on big ticketing platforms. The app uses **community submission** (plus flyer scan) as the primary source rather than brittle scraping.
 
 ---
 
-## Artist Seed List
+## Project status
+
+### Tier 1 — **Shipped**
+
+Core loop is live end-to-end: browse culture anonymously, sign in to personalize, admins can curate artists.
+
+- Dictionary lookup + personal lexicon + AI lookup pipeline  
+- Events listing, filter, submit, flyer extraction, submitter/admin edit & delete  
+- Artist directory, detail pages, stash artist, admin-only artist CRUD (UI + API)  
+- My Stash (lexicon, songs, artists)  
+- Home experience (word of day, events preview)  
+- Profile / settings  
+- Clerk authentication and **public vs authenticated** UX (sign-in prompts where needed)  
+- Shared library packages (db, api-zod, api-spec codegen, React API client)  
+- Production-oriented API serving built static frontend when configured  
+
+### Tier 2 — **Planned / not started**
+
+These are the next product milestones; they are **not** in the app yet (e.g. no `/events/:id` route today).
+
+- Dedicated **event detail** pages / shareable URLs  
+- **Artist ↔ event** relationships (lineups, promoted shows)  
+- **YouTube** (or other) playback / embed integration  
+- **Community interpretations** (e.g. collaborative notes on slang or lyrics)  
+
+### Longer term
+
+- Whole-song translations (collaborative, human-confirmed)  
+- Timestamp-linked lyrics  
+
+---
+
+## Artist seed list
 
 Famous, Emmerson, Rozzy Sokota, Arkman, Dallas Bantan, Camouflage, King Boss LA, King Melody, Jimmy B, Pretty S, Willie Jay, Drizilik
 
 ---
 
-## Local Development
+## Local development
 
-*(Coming soon - deployment and local dev instructions will be added as the app matures)*
+**Requirements:** Node.js (LTS), **pnpm** `10.33.0` (see root `package.json`), PostgreSQL, Clerk app + Anthropic API key for full AI features.
+
+1. **Clone** and install from repo root:
+
+   ```bash
+   pnpm install
+   ```
+
+2. **Environment:** Create a **`.env` at the repo root** (used by the API and loaded by Vite for prefixed vars). Typical variables include:
+
+   - `DATABASE_URL` — PostgreSQL connection string  
+   - `CLERK_SECRET_KEY` — Clerk backend  
+   - `VITE_CLERK_PUBLISHABLE_KEY` — Clerk frontend  
+   - `VITE_CLERK_PROXY_URL` — optional Clerk proxy  
+   - `ANTHROPIC_API_KEY` — dictionary, artists, flyer extraction  
+   - `PORT` — API port (frontend dev often proxies `/api` to this, default `3000`)  
+   - `ADMIN_CLERK_IDS` — optional comma-separated Clerk user IDs for admin fallback  
+   - `FRONTEND_STATIC_DIR` — optional; use when production static files are not in the default layout  
+
+3. **Run DB migrations** as documented in `lib/db` (if applicable to your setup).
+
+4. **Dev (API + Vite together)** from repo root:
+
+   ```bash
+   pnpm dev:local
+   ```
+
+   - Frontend: **http://localhost:5173** (proxies `/api` to the API)  
+   - API: port from **`PORT`** in `.env`  
+
+5. **Quality gates** (also used in CI-style workflows):
+
+   ```bash
+   pnpm run typecheck
+   pnpm run build
+   ```
+
+6. **OpenAPI / Zod codegen** (when you change the spec):
+
+   ```bash
+   pnpm --filter @workspace/api-spec run codegen
+   ```
+
+   Keep **`lib/api-zod/src/index.ts`** hand-maintained per project conventions (export only what the app needs from generated code).
 
 ---
 

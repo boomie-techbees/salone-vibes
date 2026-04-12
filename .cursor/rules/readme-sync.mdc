@@ -1,0 +1,14 @@
+---
+description: Keep README.md aligned with shipped product and roadmap after substantive changes
+alwaysApply: true
+---
+
+# README maintenance
+
+When you complete or materially change **user-facing features**, **auth/access rules**, **API surface**, **deployment**, or **tier roadmap** items, update the root **`README.md`** in the same change (or immediately after):
+
+- **Features** — Reflect what is actually live; remove stale “coming soon” language for shipped work; clarify public vs sign-in vs admin-only behavior.
+- **Project status** — Move items between **Tier 1 (shipped)**, **Tier 2 (next)**, and **longer term** so the roadmap matches reality.
+- **Local development / stack** — Adjust commands, env vars, or stack table if build or run workflows change.
+
+If the change is trivial (typos, internal refactors with no product impact), README updates are optional.
