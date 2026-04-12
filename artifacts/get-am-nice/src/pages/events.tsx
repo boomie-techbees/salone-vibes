@@ -19,6 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
+import { AiGeneratedContentNote } from "@/components/ai-generated-content-note";
 
 const submitEventSchema = z.object({
   title: z.string().min(3, "Title is required"),
@@ -496,6 +497,8 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
                   </FormItem>
                 )}
               />
+
+              <AiGeneratedContentNote className="border-t border-border/30 pt-4 mt-1" />
 
               <div className="pt-2 flex justify-end gap-3">
                 <Button type="button" variant="ghost" onClick={handleClose}>

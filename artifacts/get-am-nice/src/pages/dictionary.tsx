@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
+import { AiGeneratedContentNote } from "@/components/ai-generated-content-note";
 
 const lookupSchema = z.object({
   term: z.string().min(1, "Please enter a word or phrase"),
@@ -82,14 +83,18 @@ export function Dictionary() {
         <h1 className="font-clash text-4xl md:text-5xl font-bold text-foreground">
           Salone Dictionary
         </h1>
-        <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-          Look up Krio words and phrases, learn cultural context, and save
-          favourites to your{" "}
-          <Link href="/stash" className="text-primary underline underline-offset-2">
-            Stash
-          </Link>
-          .
-        </p>
+        <div className="text-muted-foreground text-lg max-w-2xl mx-auto space-y-1.5 px-4 sm:px-0">
+          <p className="text-balance">
+            Look up Krio words and phrases, and learn cultural context.
+          </p>
+          <p className="text-balance">
+            Save favourites to your{" "}
+            <Link href="/stash" className="text-primary underline underline-offset-2">
+              Stash
+            </Link>
+            .
+          </p>
+        </div>
       </div>
 
       <Card className="border-2 border-primary/20 shadow-md">
@@ -224,6 +229,8 @@ export function Dictionary() {
           </CardContent>
         </Card>
       )}
+
+      <AiGeneratedContentNote className="max-w-2xl mx-auto text-center border-t border-border/30 pt-6 mt-2" />
     </div>
   );
 }

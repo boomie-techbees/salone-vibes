@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRoute, Link } from "wouter";
-import { ArrowLeft, Sparkles, Pencil, Check, X, Loader2, Plus, ExternalLink, Tag, Trash2, Archive, CheckCheck } from "lucide-react";
+import { ArrowLeft, Pencil, Check, X, Loader2, Plus, ExternalLink, Tag, Trash2, Archive, CheckCheck } from "lucide-react";
 import { useAuth } from "@clerk/react";
 import {
   useGetArtist,
@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AiGeneratedContentNote } from "@/components/ai-generated-content-note";
 
 function ArtistPhoto({ artist }: { artist: Artist }) {
   const initials = artist.name
@@ -140,10 +141,7 @@ function BioEditor({
           <Pencil className="w-3.5 h-3.5" />
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground/60 flex items-center gap-1">
-        <Sparkles className="w-3 h-3 text-yellow-500" />
-        AI-generated
-      </p>
+      <AiGeneratedContentNote />
     </div>
   );
 }

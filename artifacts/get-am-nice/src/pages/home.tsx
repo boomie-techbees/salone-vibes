@@ -3,6 +3,7 @@ import { Show } from "@clerk/react";
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AiGeneratedContentNote } from "@/components/ai-generated-content-note";
 import { BookA, Calendar, ArrowRight, Loader2, Music } from "lucide-react";
 import { format } from "date-fns";
 
@@ -136,12 +137,15 @@ function TermOfTheDayCard() {
             <p className="text-muted-foreground leading-relaxed">{term.culturalContext}</p>
           </div>
         )}
-        <div className="pt-4 flex justify-end">
-          <Link href="/dictionary">
-            <Button variant="outline" className="rounded-full border-primary/20 hover:bg-primary/10 hover:text-primary">
-              Look up another word
-            </Button>
-          </Link>
+        <div className="pt-4 space-y-3">
+          <div className="flex justify-end">
+            <Link href="/dictionary">
+              <Button variant="outline" className="rounded-full border-primary/20 hover:bg-primary/10 hover:text-primary">
+                Look up another word
+              </Button>
+            </Link>
+          </div>
+          <AiGeneratedContentNote className="border-t border-border/30 pt-3" />
         </div>
       </CardContent>
     </Card>

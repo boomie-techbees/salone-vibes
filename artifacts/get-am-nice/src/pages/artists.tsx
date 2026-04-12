@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { AiGeneratedContentNote } from "@/components/ai-generated-content-note";
 
 function ArtistCard({ artist }: { artist: Artist }) {
   const initials = artist.name
@@ -140,6 +141,7 @@ function AddArtistDialog({ onCreated }: { onCreated: () => void }) {
               </>
             )}
           </Button>
+          <AiGeneratedContentNote className="text-center pt-2" />
         </form>
       </DialogContent>
     </Dialog>
@@ -188,11 +190,14 @@ export function Artists() {
       )}
 
       {!isLoading && !isError && artists && artists.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-          {artists.map((artist) => (
-            <ArtistCard key={artist.id} artist={artist} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+            {artists.map((artist) => (
+              <ArtistCard key={artist.id} artist={artist} />
+            ))}
+          </div>
+          <AiGeneratedContentNote className="max-w-2xl mx-auto text-center border-t border-border/30 pt-6" />
+        </>
       )}
     </div>
   );
