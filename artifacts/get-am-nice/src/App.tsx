@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { ClerkProvider, Show, useClerk, useAuth } from "@clerk/react";
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from "wouter";
+import { cn } from "@/lib/utils";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
@@ -66,10 +67,21 @@ function ClerkAuthBridge() {
 }
 
 function Layout({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation();
+  const isAuthRoute =
+    location.startsWith("/sign-in") || location.startsWith("/sign-up");
+
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background font-sans">
       <Navbar />
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 pt-24 pb-8">
+      <main
+        className={cn(
+          "flex-1 w-full pt-24 pb-8",
+          isAuthRoute
+            ? "px-4 sm:px-6 md:px-8 flex justify-center"
+            : "max-w-7xl mx-auto px-4 md:px-8",
+        )}
+      >
         {children}
       </main>
     </div>
