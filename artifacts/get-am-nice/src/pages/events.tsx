@@ -5,7 +5,14 @@ import * as z from "zod";
 import { format } from "date-fns";
 import { MapPin, Calendar as CalendarIcon, Ticket, Plus, Upload, X, Sparkles, Loader2, Trash2, Pencil } from "lucide-react";
 
-import { useListEvents, useSubmitEvent, useUpdateEvent, useDeleteEvent, getListEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
+import {
+  ApiError,
+  useListEvents,
+  useSubmitEvent,
+  useUpdateEvent,
+  getListEventsQueryKey,
+  getGetEventQueryKey,
+} from "@workspace/api-client-react";
 import type { Event } from "@workspace/api-client-react";
 import { useAuth, useUser } from "@clerk/react";
 import { Link } from "wouter";
@@ -119,7 +126,6 @@ function FlyerUpload({
   const [extracted, setExtracted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
   const { getToken } = useAuth();
 
   const handleFile = useCallback(
@@ -164,12 +170,11 @@ function FlyerUpload({
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Could not extract details";
         setError(msg);
-        toast({ variant: "destructive", title: "Scan failed", description: msg });
       } finally {
         setIsExtracting(false);
       }
     },
-    [getToken, onExtracted, toast]
+    [getToken, onExtracted]
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -358,13 +363,13 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
         { id: eventToEdit.id, data: body },
         {
           onSuccess: () => {
-            toast({ title: "Event Updated!", description: "Your changes have been saved." });
+            toast({ title: "Saved" });
             queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
             queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventToEdit.id) });
             handleClose();
           },
           onError: () => {
-            toast({ variant: "destructive", title: "Update Failed", description: "There was a problem saving your changes. Please try again." });
+            toast({ variant: "destructive", title: "Couldn't save changes" });
           },
         }
       );
@@ -373,15 +378,41 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
         { data: body },
         {
           onSuccess: () => {
-            toast({ title: "Event Submitted!", description: "Your event has been added to the community calendar." });
+            toast({ title: "Event added" });
             setOpen(false);
             form.reset(EMPTY_SUBMIT_EVENT_VALUES);
             setAutoFilledFields(new Set());
             setFlyerResetKey((k) => k + 1);
             queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
           },
-          onError: () => {
-            toast({ variant: "destructive", title: "Submission Failed", description: "There was a problem submitting your event. Please try again." });
+          onError: (err) => {
+            if (err instanceof ApiError && err.status === 409) {
+              const payload =
+                err.data && typeof err.data === "object"
+                  ? (err.data as { existingId?: number; message?: string })
+                  : null;
+              const id = payload?.existingId;
+              const msg = payload?.message ?? "This event is already on the calendar.";
+              toast({
+                variant: "destructive",
+                title: "Already listed",
+                description: id ? (
+                  <span className="block space-y-1">
+                    <span className="text-sm">{msg}</span>
+                    <Link href={`/events/${id}`} className="text-sm font-medium underline">
+                      Open existing
+                    </Link>
+                  </span>
+                ) : (
+                  msg
+                ),
+              });
+              return;
+            }
+            toast({
+              variant: "destructive",
+              title: "Couldn't submit",
+            });
           },
         }
       );
@@ -594,6 +625,12 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
 
               <AiGeneratedContentNote variant="confirm" className="border-t border-border/30 pt-4 mt-1" />
 
+              {!isEditing ? (
+                <p className="text-xs text-muted-foreground leading-relaxed pt-2">
+                  Events are public on the calendar. Anyone can save them to Stash, so double-check date, place, and title before you add one.
+                </p>
+              ) : null}
+
               <div className="pt-2 flex justify-end gap-3">
                 <Button type="button" variant="ghost" onClick={handleClose}>
                   Cancel
@@ -648,48 +685,113 @@ function EditEventButton({ event }: { event: Event }) {
 
 function DeleteEventButton({ eventId, eventTitle }: { eventId: number; eventTitle: string }) {
   const { toast } = useToast();
-  const deleteMutation = useDeleteEvent();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [stashCount, setStashCount] = useState<number | null>(null);
+  const [pending, setPending] = useState(false);
 
-  const handleDelete = () => {
-    deleteMutation.mutate({ id: eventId }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
-        queryClient.removeQueries({ queryKey: getGetEventQueryKey(eventId) });
-        toast({ title: "Event deleted", description: `"${eventTitle}" has been removed.` });
-      },
-      onError: () => {
-        toast({ variant: "destructive", title: "Delete failed", description: "Could not delete this event. Please try again." });
-      },
-    });
+  const finishDelete = () => {
+    queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
+    queryClient.removeQueries({ queryKey: getGetEventQueryKey(eventId) });
+    setStashCount(null);
+    setDialogOpen(false);
+  };
+
+  const requestDelete = async (confirmRemoveStashes: boolean) => {
+    setPending(true);
+    try {
+      const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+      const q = confirmRemoveStashes ? "?confirmRemoveStashes=true" : "";
+      const res = await fetch(`${basePath}/api/events/${eventId}${q}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (res.status === 409) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+          stashCount?: number;
+        } | null;
+        if (body?.error === "event_has_stashes" && typeof body.stashCount === "number" && body.stashCount > 0) {
+          setStashCount(body.stashCount);
+          return;
+        }
+      }
+
+      if (!res.ok) {
+        toast({ variant: "destructive", title: "Couldn't delete" });
+        return;
+      }
+
+      finishDelete();
+    } finally {
+      setPending(false);
+    }
   };
 
   return (
-    <AlertDialog>
+    <AlertDialog
+      open={dialogOpen}
+      onOpenChange={(open) => {
+        setDialogOpen(open);
+        if (!open) setStashCount(null);
+      }}
+    >
       <AlertDialogTrigger asChild>
         <Button
           size="icon"
           variant="ghost"
           className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-          disabled={deleteMutation.isPending}
+          disabled={pending}
         >
-          {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete this event?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will permanently remove <span className="font-medium text-foreground">"{eventTitle}"</span> from the community calendar. This cannot be undone.
+          <AlertDialogTitle>
+            {stashCount != null ? "Remove from Stash too?" : "Delete this event?"}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="space-y-3">
+            {stashCount != null ? (
+              <span className="block">
+                <span className="font-medium text-foreground">{stashCount}</span>{" "}
+                {stashCount === 1 ? "person has" : "people have"} this event in Stash. Deleting removes it from the
+                calendar and from their Stash. This cannot be undone.
+              </span>
+            ) : (
+              <span className="block">
+                This will permanently remove{" "}
+                <span className="font-medium text-foreground">"{eventTitle}"</span> from the community calendar. If
+                others saved it to Stash, you will be asked to confirm a second time before removal.
+              </span>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleDelete}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            Delete Event
-          </AlertDialogAction>
+          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          {stashCount != null ? (
+            <AlertDialogAction
+              disabled={pending}
+              onClick={(e) => {
+                e.preventDefault();
+                void requestDelete(true);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {pending ? "Deleting…" : "Delete everywhere"}
+            </AlertDialogAction>
+          ) : (
+            <AlertDialogAction
+              disabled={pending}
+              onClick={(e) => {
+                e.preventDefault();
+                void requestDelete(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {pending ? "…" : "Delete Event"}
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

@@ -1,8 +1,8 @@
 import { Router } from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
-import { eventsTable } from "@workspace/db";
-import { gte, or, ilike, and, eq } from "drizzle-orm";
+import { eventsTable, stashedEventsTable } from "@workspace/db";
+import { gte, or, ilike, and, eq, sql, lt, count } from "drizzle-orm";
 import { z } from "zod";
 import { SubmitEventBody, ListEventsQueryParams } from "@workspace/api-zod";
 import { getClerkUserId, isClerkAdmin } from "../lib/clerkAdmin";
@@ -87,6 +87,38 @@ function normalizeExtractedJson(parsed: unknown): unknown {
   }
 
   return o;
+}
+
+/** Collapse text for cross-user duplicate detection (same flyer, slightly different typing). */
+function normalizeDedupeText(raw: string): string {
+  return raw
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\p{M}+/gu, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+/**
+ * Same words in any order (handles "Freetown, Sierra Leone" vs "Sierra Leone — Freetown"
+ * and words split across location vs venue).
+ */
+function tokenSortKey(raw: string | null | undefined): string {
+  const collapsed = normalizeDedupeText(raw ?? "");
+  if (!collapsed) return "";
+  return collapsed.split(" ").filter(Boolean).sort().join(" ");
+}
+
+function placeDedupeKey(location: string, venue: string | null | undefined): string {
+  const merged = [location, venue ?? ""].filter((s) => typeof s === "string" && s.trim() !== "").join(" ");
+  return tokenSortKey(merged);
+}
+
+function utcDayRangeForInstant(d: Date): { start: Date; end: Date } {
+  const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
+  const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0, 0));
+  return { start, end };
 }
 
 const router = Router();
@@ -253,6 +285,55 @@ router.post("/events", async (req, res) => {
   }
 
   const data = parseResult.data;
+  const eventInstant = new Date(data.eventDate);
+
+  const ticketTrimmed = data.ticketUrl?.trim() ?? "";
+  if (ticketTrimmed) {
+    const [byTicket] = await db
+      .select({ id: eventsTable.id })
+      .from(eventsTable)
+      .where(sql`lower(trim(${eventsTable.ticketUrl})) = lower(trim(${ticketTrimmed}))`)
+      .limit(1);
+    if (byTicket) {
+      return res.status(409).json({
+        error: "duplicate_event",
+        message: "An event with this ticket link is already listed.",
+        existingId: byTicket.id,
+      });
+    }
+  }
+
+  const titleNorm = normalizeDedupeText(data.title);
+  const newPlaceKey = placeDedupeKey(data.location, data.venue ?? null);
+  const { start: dayStart, end: dayEnd } = utcDayRangeForInstant(eventInstant);
+
+  const dayCandidates = await db
+    .select({
+      id: eventsTable.id,
+      title: eventsTable.title,
+      location: eventsTable.location,
+      venue: eventsTable.venue,
+    })
+    .from(eventsTable)
+    .where(and(gte(eventsTable.eventDate, dayStart), lt(eventsTable.eventDate, dayEnd)));
+
+  for (const row of dayCandidates) {
+    if (normalizeDedupeText(row.title) !== titleNorm) continue;
+
+    const rowPlaceKey = placeDedupeKey(row.location, row.venue);
+    const strictLocationMatch = normalizeDedupeText(row.location) === normalizeDedupeText(data.location);
+    const fuzzyPlaceMatch =
+      newPlaceKey.length > 0 && rowPlaceKey === newPlaceKey;
+
+    if (strictLocationMatch || fuzzyPlaceMatch) {
+      return res.status(409).json({
+        error: "duplicate_event",
+        message: "This event is already on the calendar (same title, date, and place).",
+        existingId: row.id,
+      });
+    }
+  }
+
   const [event] = await db
     .insert(eventsTable)
     .values({
@@ -261,7 +342,7 @@ router.post("/events", async (req, res) => {
       location: data.location,
       city: data.city ?? null,
       country: data.country ?? null,
-      eventDate: new Date(data.eventDate),
+      eventDate: eventInstant,
       venue: data.venue ?? null,
       ticketUrl: data.ticketUrl ?? null,
       performingArtists: data.performingArtists ?? null,
@@ -351,6 +432,24 @@ router.delete("/events/:id", async (req, res) => {
     isClerkAdmin(req) || existing.submittedBy === clerkUserId;
   if (!canDelete) {
     return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const [stashAgg] = await db
+    .select({ stashCount: count() })
+    .from(stashedEventsTable)
+    .where(eq(stashedEventsTable.eventId, id));
+
+  const stashCount = Number(stashAgg?.stashCount ?? 0);
+  const confirmRemoveStashes =
+    req.query.confirmRemoveStashes === "true" || req.query.confirmRemoveStashes === "1";
+
+  if (stashCount > 0 && !confirmRemoveStashes) {
+    return res.status(409).json({
+      error: "event_has_stashes",
+      stashCount,
+      message:
+        "This event is saved in one or more users’ Stash. Deleting it removes the calendar entry and those stash links.",
+    });
   }
 
   await db.delete(eventsTable).where(eq(eventsTable.id, id));
