@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
@@ -16,8 +17,16 @@ function resolveFrontendStaticDir(): string | null {
     if (fs.existsSync(abs)) return abs;
     logger.warn({ FRONTEND_STATIC_DIR: fromEnv }, "FRONTEND_STATIC_DIR set but path does not exist");
   }
-  const candidate = path.join(process.cwd(), "artifacts/get-am-nice/dist/public");
-  if (fs.existsSync(candidate)) return candidate;
+  // pnpm runs `start` with cwd = artifacts/api-server, not repo root — do not rely on cwd alone.
+  const bundleDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.resolve(bundleDir, "../../get-am-nice/dist/public"),
+    path.resolve(process.cwd(), "../get-am-nice/dist/public"),
+    path.join(process.cwd(), "artifacts/get-am-nice/dist/public"),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(dir)) return dir;
+  }
   return null;
 }
 
