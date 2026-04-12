@@ -51,9 +51,11 @@ export default defineConfig({
       workspace: apiZodSrc,
       client: "zod",
       target: "generated",
-      schemas: { path: "generated/types", type: "typescript" },
+      // Do not emit parallel TypeScript interfaces here: they duplicate Zod schema
+      // export names and break `export *` / composite builds (TS2308).
       mode: "split",
       clean: true,
+      indexFiles: false,
       prettier: true,
       override: {
         zod: {
