@@ -18,6 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { AiGeneratedContentNote } from "@/components/ai-generated-content-note";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 function ArtistCard({ artist }: { artist: Artist }) {
   const initials = artist.name
@@ -149,11 +150,12 @@ function AddArtistDialog({ onCreated }: { onCreated: () => void }) {
 }
 
 export function Artists() {
+  const isAdmin = useIsAdmin();
   const { data: artists, isLoading, isError } = useListArtists();
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="font-clash text-3xl md:text-4xl font-bold text-foreground">
             Artists
@@ -162,7 +164,7 @@ export function Artists() {
             Salone's finest musicians
           </p>
         </div>
-        <AddArtistDialog onCreated={() => {}} />
+        {isAdmin ? <AddArtistDialog onCreated={() => {}} /> : null}
       </div>
 
       {isLoading && (
@@ -184,7 +186,9 @@ export function Artists() {
           </div>
           <p className="text-muted-foreground text-lg">No artists yet.</p>
           <p className="text-muted-foreground text-sm mt-1">
-            Add the first Salone artist to get started.
+            {isAdmin
+              ? "Add the first Salone artist to get started."
+              : "New artists will appear here as the directory grows."}
           </p>
         </div>
       )}

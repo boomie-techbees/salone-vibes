@@ -1,5 +1,5 @@
 import { useGetTermOfTheDay, getGetTermOfTheDayQueryKey, useGetUpcomingEventsPreview, getGetUpcomingEventsPreviewQueryKey } from "@workspace/api-client-react";
-import { Show } from "@clerk/react";
+import { Show, useAuth } from "@clerk/react";
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -153,6 +153,7 @@ function TermOfTheDayCard() {
 }
 
 function UpcomingEventsPreview() {
+  const { isSignedIn } = useAuth();
   const { data: events, isLoading } = useGetUpcomingEventsPreview({
     query: { queryKey: getGetUpcomingEventsPreviewQueryKey() }
   });
@@ -175,8 +176,10 @@ function UpcomingEventsPreview() {
         <CardContent className="p-8 text-center text-muted-foreground flex flex-col items-center gap-2">
           <Calendar className="w-8 h-8 opacity-50" />
           <p>No upcoming events found.</p>
-          <Link href="/events">
-            <Button variant="link" className="text-primary mt-2">Submit an event</Button>
+          <Link href={isSignedIn ? "/events" : "/sign-in"}>
+            <Button variant="link" className="text-primary mt-2">
+              {isSignedIn ? "Submit an event" : "Sign in to submit an event"}
+            </Button>
           </Link>
         </CardContent>
       </Card>

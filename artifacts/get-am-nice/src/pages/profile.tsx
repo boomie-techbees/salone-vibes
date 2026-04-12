@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useAuth, useUser, Show, RedirectToSignIn } from "@clerk/react";
-import { Loader2, LogOut, Settings } from "lucide-react";
+import { useAuth, useUser, Show } from "@clerk/react";
+import { Link } from "wouter";
+import { Loader2, LogOut, Settings, Lock } from "lucide-react";
 import { format } from "date-fns";
 
 import {
@@ -264,6 +265,30 @@ export function Profile() {
   );
 }
 
+function ProfileSignInPrompt() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4 max-w-lg mx-auto">
+      <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+        <Lock className="w-9 h-9 text-primary/60" />
+      </div>
+      <h2 className="font-clash text-3xl font-bold mb-3">Your settings</h2>
+      <p className="text-muted-foreground mb-8 leading-relaxed">
+        Sign in to manage your profile, display name, and account details.
+      </p>
+      <div className="flex gap-3">
+        <Link href="/sign-in">
+          <Button variant="outline" className="rounded-full px-6">
+            Log in
+          </Button>
+        </Link>
+        <Link href="/sign-up">
+          <Button className="rounded-full px-6">Sign up free</Button>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export function ProfilePage() {
   return (
     <>
@@ -271,7 +296,7 @@ export function ProfilePage() {
         <Profile />
       </Show>
       <Show when="signed-out">
-        <RedirectToSignIn />
+        <ProfileSignInPrompt />
       </Show>
     </>
   );

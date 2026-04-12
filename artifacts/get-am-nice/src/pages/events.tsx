@@ -7,7 +7,9 @@ import { MapPin, Calendar as CalendarIcon, Ticket, Plus, Upload, X, Sparkles, Lo
 
 import { useListEvents, useSubmitEvent, useUpdateEvent, useDeleteEvent, getListEventsQueryKey } from "@workspace/api-client-react";
 import type { Event } from "@workspace/api-client-react";
-import { useUser } from "@clerk/react";
+import { useAuth, useUser } from "@clerk/react";
+import { Link } from "wouter";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -102,6 +104,7 @@ function FlyerUpload({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { getToken } = useAuth();
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -123,9 +126,14 @@ function FlyerUpload({
       try {
         const { base64, mimeType } = await resizeAndEncodeImage(file);
         const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+        const token = await getToken();
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (token) headers.Authorization = `Bearer ${token}`;
         const res = await fetch(`${basePath}/api/events/extract-flyer`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ imageBase64: base64, mimeType }),
         });
 
@@ -146,7 +154,7 @@ function FlyerUpload({
         setIsExtracting(false);
       }
     },
-    [onExtracted, toast]
+    [getToken, onExtracted, toast]
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -233,6 +241,7 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
   const [open, setOpen] = useState(isEditing);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  const { isSignedIn } = useAuth();
   const submitMutation = useSubmitEvent();
   const updateMutation = useUpdateEvent();
 
@@ -343,6 +352,25 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
   const isPending = submitMutation.isPending || updateMutation.isPending;
 
   const isAutoFilled = (field: string) => autoFilledFields.has(field);
+
+  if (!isSignedIn && !isEditing) {
+    if (trigger) {
+      return (
+        <Button asChild>
+          <Link href="/sign-in" className="inline-flex items-center justify-center">
+            Sign in to submit an event
+          </Link>
+        </Button>
+      );
+    }
+    return (
+      <Button asChild variant="outline" className="border-primary/30 hover:bg-primary/10 text-primary whitespace-nowrap">
+        <Link href="/sign-in" className="inline-flex items-center gap-1">
+          <Plus className="w-4 h-4" /> Sign in to add an event
+        </Link>
+      </Button>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); else setOpen(true); }}>
@@ -604,7 +632,7 @@ function DeleteEventButton({ eventId, eventTitle }: { eventId: number; eventTitl
 export function Events() {
   const { user } = useUser();
   const currentClerkId = user?.id ?? null;
-  const isAdminUser = user?.publicMetadata?.role === "admin";
+  const isAdminUser = useIsAdmin();
   const [locationFilter, setLocationFilter] = useState("");
   const [debouncedFilter, setDebouncedFilter] = useState("");
 

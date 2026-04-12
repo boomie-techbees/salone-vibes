@@ -1,17 +1,11 @@
 import { Router } from "express";
 import Anthropic from "@anthropic-ai/sdk";
-import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { eventsTable } from "@workspace/db";
 import { gte, or, ilike, and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { SubmitEventBody, ListEventsQueryParams } from "@workspace/api-zod";
-
-const ADMIN_IDS = (process.env.ADMIN_CLERK_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-
-function isAdmin(clerkUserId: string | null | undefined): boolean {
-  return !!clerkUserId && ADMIN_IDS.includes(clerkUserId);
-}
+import { getClerkUserId, isClerkAdmin } from "../lib/clerkAdmin";
 
 const ExtractFlyerBody = z.object({
   imageBase64: z.string().min(1),
@@ -35,6 +29,10 @@ const ExtractedEventSchema = z.object({
 const router = Router();
 
 router.post("/events/extract-flyer", async (req, res) => {
+  if (!getClerkUserId(req)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   const parseResult = ExtractFlyerBody.safeParse(req.body);
   if (!parseResult.success) {
     console.error("[extract-flyer] invalid body:", parseResult.error.issues);
@@ -166,8 +164,10 @@ router.post("/events", async (req, res) => {
     return res.status(400).json({ error: parseResult.error.issues });
   }
 
-  const auth = getAuth(req);
-  const clerkUserId = auth?.userId ?? null;
+  const clerkUserId = getClerkUserId(req);
+  if (!clerkUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
   const data = parseResult.data;
   const [event] = await db
@@ -190,8 +190,7 @@ router.post("/events", async (req, res) => {
 });
 
 router.put("/events/:id", async (req, res) => {
-  const auth = getAuth(req);
-  const clerkUserId = auth?.userId ?? null;
+  const clerkUserId = getClerkUserId(req);
   if (!clerkUserId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
@@ -216,7 +215,8 @@ router.put("/events/:id", async (req, res) => {
     return res.status(404).json({ error: "Event not found" });
   }
 
-  const canEdit = isAdmin(clerkUserId) || existing.submittedBy === clerkUserId;
+  const canEdit =
+    isClerkAdmin(req) || existing.submittedBy === clerkUserId;
   if (!canEdit) {
     return res.status(403).json({ error: "Forbidden" });
   }
@@ -241,19 +241,31 @@ router.put("/events/:id", async (req, res) => {
 });
 
 router.delete("/events/:id", async (req, res) => {
+  const clerkUserId = getClerkUserId(req);
+  if (!clerkUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     return res.status(400).json({ error: "Invalid event id" });
   }
 
-  const existing = await db
-    .select({ id: eventsTable.id })
+  const existingRows = await db
+    .select({ id: eventsTable.id, submittedBy: eventsTable.submittedBy })
     .from(eventsTable)
     .where(eq(eventsTable.id, id))
     .limit(1);
 
-  if (existing.length === 0) {
+  const existing = existingRows[0];
+  if (!existing) {
     return res.status(404).json({ error: "Event not found" });
+  }
+
+  const canDelete =
+    isClerkAdmin(req) || existing.submittedBy === clerkUserId;
+  if (!canDelete) {
+    return res.status(403).json({ error: "Forbidden" });
   }
 
   await db.delete(eventsTable).where(eq(eventsTable.id, id));

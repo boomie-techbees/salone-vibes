@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { artistsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { getClerkUserId, isClerkAdmin } from "../lib/clerkAdmin";
 
 const CreateArtistBody = z.object({ name: z.string().min(1) });
 
@@ -101,6 +102,13 @@ router.get("/artists/:id", async (req, res) => {
 });
 
 router.post("/artists", async (req, res) => {
+  if (!getClerkUserId(req)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  if (!isClerkAdmin(req)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
   const parseResult = CreateArtistBody.safeParse(req.body);
   if (!parseResult.success) {
     return res.status(400).json({ error: parseResult.error.issues });
@@ -118,6 +126,13 @@ router.post("/artists", async (req, res) => {
 });
 
 router.put("/artists/:id", async (req, res) => {
+  if (!getClerkUserId(req)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  if (!isClerkAdmin(req)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     return res.status(400).json({ error: "Invalid artist id" });

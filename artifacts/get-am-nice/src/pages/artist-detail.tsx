@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRoute, Link } from "wouter";
 import { ArrowLeft, Pencil, Check, X, Loader2, Plus, ExternalLink, Tag, Trash2, Archive, CheckCheck } from "lucide-react";
 import { useAuth } from "@clerk/react";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 import {
   useGetArtist,
   useUpdateArtist,
@@ -52,9 +53,11 @@ function ArtistPhoto({ artist }: { artist: Artist }) {
 function BioEditor({
   artistId,
   bio,
+  canEdit,
 }: {
   artistId: number;
   bio: string | null | undefined;
+  canEdit: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(bio ?? "");
@@ -73,6 +76,17 @@ function BioEditor({
       },
     },
   });
+
+  if (!canEdit) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {bio || "No bio yet."}
+        </p>
+        <AiGeneratedContentNote />
+      </div>
+    );
+  }
 
   function handleSave() {
     update.mutate({ id: artistId, data: { bio: draft } });
@@ -149,9 +163,11 @@ function BioEditor({
 function VibeTagsEditor({
   artistId,
   vibeTags,
+  canEdit,
 }: {
   artistId: number;
   vibeTags: string[] | null | undefined;
+  canEdit: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [tags, setTags] = useState<string[]>(vibeTags ?? []);
@@ -171,6 +187,31 @@ function VibeTagsEditor({
       },
     },
   });
+
+  if (!canEdit) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Tag className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Vibe &amp; Genre</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {(vibeTags ?? []).map((tag) => (
+            <Badge
+              key={tag}
+              variant="secondary"
+              className="rounded-full text-xs gap-1"
+            >
+              {tag}
+            </Badge>
+          ))}
+          {(!vibeTags || vibeTags.length === 0) && (
+            <span className="text-xs text-muted-foreground">No tags yet.</span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   function addTag() {
     const t = input.trim();
@@ -293,9 +334,11 @@ function VibeTagsEditor({
 function LinksEditor({
   artistId,
   links,
+  canEdit,
 }: {
   artistId: number;
   links: ArtistLink[] | null | undefined;
+  canEdit: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ArtistLink[]>(links ?? []);
@@ -316,6 +359,35 @@ function LinksEditor({
       },
     },
   });
+
+  if (!canEdit) {
+    const displayLinks = links ?? [];
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <ExternalLink className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Links</span>
+        </div>
+        <div className="space-y-1.5">
+          {displayLinks.map((link, i) => (
+            <a
+              key={i}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+            >
+              <ExternalLink className="w-3 h-3" />
+              {link.label}
+            </a>
+          ))}
+          {displayLinks.length === 0 && (
+            <span className="text-xs text-muted-foreground">No links yet.</span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   function addLink() {
     if (!label.trim() || !url.trim()) return;
@@ -552,6 +624,7 @@ function StashButton({ artistId }: { artistId: number }) {
 export function ArtistDetail() {
   const [, params] = useRoute("/artists/:id");
   const id = Number(params?.id);
+  const isAdmin = useIsAdmin();
 
   const { data: artist, isLoading, isError } = useGetArtist(id, {
     query: { queryKey: getGetArtistQueryKey(id), enabled: !!id && !isNaN(id) },
@@ -610,15 +683,19 @@ export function ArtistDetail() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
             Bio
           </h2>
-          <BioEditor artistId={artist.id} bio={artist.bio} />
+          <BioEditor artistId={artist.id} bio={artist.bio} canEdit={isAdmin} />
         </div>
 
         <div className="pt-4">
-          <VibeTagsEditor artistId={artist.id} vibeTags={artist.vibeTags} />
+          <VibeTagsEditor
+            artistId={artist.id}
+            vibeTags={artist.vibeTags}
+            canEdit={isAdmin}
+          />
         </div>
 
         <div className="pt-4">
-          <LinksEditor artistId={artist.id} links={artist.links} />
+          <LinksEditor artistId={artist.id} links={artist.links} canEdit={isAdmin} />
         </div>
       </div>
     </div>
