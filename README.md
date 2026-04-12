@@ -30,7 +30,7 @@ Everything below is **implemented** in the repo unless marked *planned*.
 | Area | What’s live |
 | --- | --- |
 | **Save to Lexicon** | From dictionary results, save entries into *your* lexicon (after sign-in). |
-| **My Stash** | One hub: **My Lexicon** (edit notes, fix AI text, delete entries), **My Artists** (stashed artists), **Songs I Love** (CRUD + notes). **Drag-and-drop** section order is **saved on your account** (not local-only). Signed-out visitors see a **sign-in / sign-up** prompt (feature is not hidden). |
+| **My Stash** | One hub: **My Lexicon**, **My Artists**, **Songs I Love** — each section is **collapsible**, and items use **compact cards** (tap to expand full details). **Edit** and **delete** are on each card; every remove uses a **confirmation** dialog. **Drag-and-drop** section order is **saved on your account**. **Stash It** is the save label on Dictionary and artist pages. Signed-out visitors see a **sign-in / sign-up** prompt (feature is not hidden). |
 | **Save artist to Stash** | On artist detail, stash / unstash. Signed-out users get a **sign-in** CTA. |
 | **Submit an event** | Manual form + optional **flyer upload**; Claude extracts fields to pre-fill the form. **Sign-in required**; signed-out users see **sign-in** CTAs instead of the submit dialog. Submitters can edit/delete **their** events. |
 | **Profile / Settings** | Display name, email/method summary, sign out. Signed-out visitors see a **sign-in** prompt. |

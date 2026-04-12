@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Search, Loader2, Save, BookOpen, ChevronRight } from "lucide-react";
+import { Search, Loader2, Archive, BookOpen, ChevronRight } from "lucide-react";
 import { useAuth } from "@clerk/react";
 import { Link } from "wouter";
 
@@ -172,13 +172,13 @@ export function Dictionary() {
                     {createEntryMutation.isPending ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     ) : (
-                      <Save className="w-4 h-4 mr-2" />
+                      <Archive className="w-4 h-4 mr-2" />
                     )}
-                    Save to Lexicon
+                    Stash It
                   </Button>
                 ) : (
                   <Button asChild variant="outline" className="rounded-full">
-                    <Link href="/sign-in">Sign in to save</Link>
+                    <Link href="/sign-in">Sign in to stash</Link>
                   </Button>
                 )}
               </div>

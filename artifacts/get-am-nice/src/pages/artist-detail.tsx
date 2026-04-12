@@ -22,6 +22,17 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AiGeneratedContentNote } from "@/components/ai-generated-content-note";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 function ArtistPhoto({ artist }: { artist: Artist }) {
   const initials = artist.name
@@ -344,6 +355,9 @@ function LinksEditor({
   const [draft, setDraft] = useState<ArtistLink[]>(links ?? []);
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
+  const [pendingRemoveIndex, setPendingRemoveIndex] = useState<number | null>(
+    null,
+  );
   const { toast } = useToast();
 
   const update = useUpdateArtist({
@@ -449,7 +463,7 @@ function LinksEditor({
                   size="icon"
                   variant="ghost"
                   className="h-6 w-6 text-destructive"
-                  onClick={() => removeLink(i)}
+                  onClick={() => setPendingRemoveIndex(i)}
                 >
                   <Trash2 className="w-3 h-3" />
                 </Button>
@@ -471,6 +485,34 @@ function LinksEditor({
           <span className="text-xs text-muted-foreground">No links yet.</span>
         )}
       </div>
+
+      <AlertDialog
+        open={pendingRemoveIndex !== null}
+        onOpenChange={(o) => !o && setPendingRemoveIndex(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this link?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingRemoveIndex !== null && draft[pendingRemoveIndex]
+                ? `Remove "${draft[pendingRemoveIndex].label}" from the list. You can add it again before saving, or save to update the artist.`
+                : "Remove this link from the list?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingRemoveIndex !== null) removeLink(pendingRemoveIndex);
+                setPendingRemoveIndex(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {editing && (
         <div className="space-y-2 pt-1">
@@ -553,7 +595,7 @@ function StashButton({ artistId }: { artistId: number }) {
     mutation: {
       onSuccess: () => {
         invalidate();
-        toast({ title: "Saved to Stash" });
+        toast({ title: "Stashed!" });
       },
       onError: () =>
         toast({ variant: "destructive", title: "Couldn't save to Stash" }),
@@ -576,7 +618,7 @@ function StashButton({ artistId }: { artistId: number }) {
       <Button asChild variant="outline" size="sm" className="rounded-full gap-2">
         <Link href="/sign-in">
           <Archive className="w-4 h-4" />
-          Save to Stash
+          Stash It
         </Link>
       </Button>
     );
@@ -586,20 +628,41 @@ function StashButton({ artistId }: { artistId: number }) {
 
   if (isSaved) {
     return (
-      <Button
-        variant="secondary"
-        size="sm"
-        className="rounded-full gap-2"
-        disabled={isPending || stashLoading}
-        onClick={() => unstashMutation.mutate({ artistId })}
-      >
-        {isPending ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <CheckCheck className="w-4 h-4 text-primary" />
-        )}
-        Saved
-      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="rounded-full gap-2"
+            disabled={isPending || stashLoading}
+          >
+            {isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <CheckCheck className="w-4 h-4 text-primary" />
+            )}
+            Stashed
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove from your stash?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You can open this page again and tap Stash It anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isPending}
+              onClick={() => unstashMutation.mutate({ artistId })}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     );
   }
 
@@ -616,7 +679,7 @@ function StashButton({ artistId }: { artistId: number }) {
       ) : (
         <Archive className="w-4 h-4" />
       )}
-      Save to Stash
+      Stash It
     </Button>
   );
 }

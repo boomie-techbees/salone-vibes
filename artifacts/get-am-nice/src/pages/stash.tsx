@@ -17,6 +17,7 @@ import {
   Mic2,
   Lock,
   GripVertical,
+  ChevronDown,
 } from "lucide-react";
 
 import {
@@ -57,6 +58,7 @@ import {
 import type {
   LexiconEntry,
   Song,
+  StashedArtistEntry,
   UserProfileStashSectionOrderItem,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -77,6 +79,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Form,
   FormControl,
@@ -99,7 +117,6 @@ function EditLexiconEntryDialog({ entry }: { entry: LexiconEntry }) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const updateMutation = useUpdateLexiconEntry();
-  const deleteMutation = useDeleteLexiconEntry();
 
   const form = useForm<z.infer<typeof editEntrySchema>>({
     resolver: zodResolver(editEntrySchema),
@@ -131,26 +148,6 @@ function EditLexiconEntryDialog({ entry }: { entry: LexiconEntry }) {
     );
   };
 
-  const handleDelete = () => {
-    if (confirm(`Remove "${entry.term}" from your lexicon?`)) {
-      deleteMutation.mutate(
-        { id: entry.id },
-        {
-          onSuccess: () => {
-            toast({ title: "Entry removed" });
-            setOpen(false);
-            queryClient.invalidateQueries({
-              queryKey: getListLexiconQueryKey(),
-            });
-          },
-          onError: () => {
-            toast({ variant: "destructive", title: "Failed to remove entry" });
-          },
-        },
-      );
-    }
-  };
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -158,22 +155,15 @@ function EditLexiconEntryDialog({ entry }: { entry: LexiconEntry }) {
           variant="ghost"
           size="icon"
           className="h-8 w-8 text-muted-foreground hover:text-primary"
+          aria-label={`Edit ${entry.term}`}
         >
           <PenLine className="w-4 h-4" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="font-clash text-2xl flex items-center justify-between">
-            <span>Edit "{entry.term}"</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleDelete}
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+          <DialogTitle className="font-clash text-2xl">
+            Edit "{entry.term}"
           </DialogTitle>
           <DialogDescription>
             Correct any AI errors or add your own personal notes.
@@ -266,60 +256,143 @@ function EditLexiconEntryDialog({ entry }: { entry: LexiconEntry }) {
   );
 }
 
-function LexiconEntryCard({ entry }: { entry: LexiconEntry }) {
+function DeleteLexiconEntryButton({ entry }: { entry: LexiconEntry }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const deleteMutation = useDeleteLexiconEntry({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListLexiconQueryKey() });
+        toast({ title: "Removed from lexicon" });
+        setOpen(false);
+      },
+      onError: () =>
+        toast({
+          variant: "destructive",
+          title: "Failed to remove entry",
+        }),
+    },
+  });
+
   return (
-    <Card className="flex flex-col h-full overflow-hidden hover:shadow-md transition-all border-border/60 hover:border-primary/30">
-      <CardHeader className="bg-primary/5 pb-4 border-b border-border/50">
-        <div className="flex justify-between items-start gap-2">
-          <div>
-            <CardTitle className="font-clash text-2xl text-primary">
-              {entry.term}
-            </CardTitle>
-            <div className="flex flex-wrap gap-2 mt-2 text-xs font-medium">
-              {entry.partOfSpeech && (
-                <span className="text-secondary italic">
-                  {entry.partOfSpeech}
-                </span>
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          aria-label={`Remove ${entry.term} from lexicon`}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove &ldquo;{entry.term}&rdquo;?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This removes the word from your lexicon. You can look it up again and
+            stash it later.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={deleteMutation.isPending}
+            onClick={() => deleteMutation.mutate({ id: entry.id })}
+          >
+            {deleteMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              "Remove"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function LexiconEntryCard({ entry }: { entry: LexiconEntry }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="overflow-hidden border-border/60 transition-shadow hover:border-primary/30 hover:shadow-md">
+      <CardHeader className="p-3 sm:p-4 space-y-0">
+        <div className="flex items-start gap-2">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-start gap-2 rounded-md text-left outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+          >
+            <ChevronDown
+              className={cn(
+                "mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                expanded && "rotate-180",
               )}
-              {entry.pronunciation && (
-                <span className="text-muted-foreground font-mono">
-                  /{entry.pronunciation}/
-                </span>
-              )}
+            />
+            <div className="min-w-0">
+              <CardTitle className="font-clash text-lg leading-tight text-primary">
+                {entry.term}
+              </CardTitle>
+              <p className="mt-0.5 text-xs font-medium italic text-muted-foreground">
+                {entry.partOfSpeech?.trim() || "—"}
+              </p>
             </div>
+          </button>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <EditLexiconEntryDialog entry={entry} />
+            <DeleteLexiconEntryButton entry={entry} />
           </div>
-          <EditLexiconEntryDialog entry={entry} />
         </div>
       </CardHeader>
-      <CardContent className="p-5 flex-1 flex flex-col gap-4">
-        <p className="text-foreground leading-relaxed">{entry.definition}</p>
-        {entry.usageExamples && entry.usageExamples.length > 0 && (
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-              Usage Examples
-            </h4>
-            <ul className="space-y-2">
-              {entry.usageExamples.map((example: string, i: number) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-2 text-sm text-foreground/90 leading-relaxed"
-                >
-                  <ChevronRight className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                  <span>{example}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {entry.notes && (
-          <div className="mt-auto pt-4 border-t border-border/50">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
-              My Notes
-            </h4>
-            <p className="text-sm italic text-foreground/80">{entry.notes}</p>
-          </div>
-        )}
-      </CardContent>
+      {expanded && (
+        <CardContent className="space-y-4 border-t border-border/50 px-3 pb-4 pt-3 sm:px-4">
+          {entry.pronunciation && (
+            <p className="text-xs font-mono text-muted-foreground">
+              /{entry.pronunciation}/
+            </p>
+          )}
+          <p className="text-sm leading-relaxed text-foreground">
+            {entry.definition}
+          </p>
+          {entry.culturalContext && (
+            <div>
+              <h4 className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Cultural context
+              </h4>
+              <p className="text-sm text-foreground/90">{entry.culturalContext}</p>
+            </div>
+          )}
+          {entry.usageExamples && entry.usageExamples.length > 0 && (
+            <div>
+              <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Usage examples
+              </h4>
+              <ul className="space-y-2">
+                {entry.usageExamples.map((example: string, i: number) => (
+                  <li
+                    key={i}
+                    className="flex items-start gap-2 text-sm text-foreground/90 leading-relaxed"
+                  >
+                    <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <span>{example}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {entry.notes && (
+            <div className="border-t border-border/40 pt-3">
+              <h4 className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                My notes
+              </h4>
+              <p className="text-sm italic text-foreground/80">{entry.notes}</p>
+            </div>
+          )}
+        </CardContent>
+      )}
     </Card>
   );
 }
@@ -494,6 +567,99 @@ function SongDialog({
   );
 }
 
+function SongStashRow({
+  song,
+  onEdit,
+  deleteSong,
+  deletePending,
+}: {
+  song: Song;
+  onEdit: () => void;
+  deleteSong: (id: number) => void;
+  deletePending: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <li className="overflow-hidden rounded-lg border border-border/40 bg-muted/50">
+      <div className="flex items-start gap-2 p-3">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-start gap-2 rounded-md text-left outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+        >
+          <ChevronDown
+            className={cn(
+              "mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+              expanded && "rotate-180",
+            )}
+          />
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-foreground">{song.songTitle}</p>
+            <p className="text-sm font-medium text-primary">{song.artistName}</p>
+          </div>
+        </button>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            onClick={onEdit}
+            aria-label={`Edit ${song.songTitle}`}
+          >
+            <PenLine className="w-4 h-4" />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                aria-label={`Remove ${song.songTitle}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove this song?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  &ldquo;{song.songTitle}&rdquo; by {song.artistName} will be removed
+                  from Songs I Love. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={deletePending}
+                  onClick={() => deleteSong(song.id)}
+                >
+                  {deletePending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Remove"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+      {expanded && (
+        <div className="border-t border-border/40 px-3 pb-3 pt-2">
+          {song.note?.trim() ? (
+            <p className="text-sm italic text-muted-foreground">{song.note}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">No note yet — edit to add one.</p>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
 function SongsILove() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -604,43 +770,13 @@ function SongsILove() {
       ) : (
         <ul className="space-y-3">
           {songs.map((song) => (
-            <li
+            <SongStashRow
               key={song.id}
-              className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 border border-border/40 group"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-foreground truncate">
-                  {song.songTitle}
-                </p>
-                <p className="text-sm text-primary font-medium">
-                  {song.artistName}
-                </p>
-                {song.note && (
-                  <p className="text-sm text-muted-foreground mt-1 italic">
-                    {song.note}
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                  onClick={() => openEdit(song)}
-                >
-                  <PenLine className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => deleteMutation.mutate({ id: song.id })}
-                  disabled={deleteMutation.isPending}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </li>
+              song={song}
+              onEdit={() => openEdit(song)}
+              deleteSong={(id) => deleteMutation.mutate({ id })}
+              deletePending={deleteMutation.isPending}
+            />
           ))}
         </ul>
       )}
@@ -657,6 +793,123 @@ function SongsILove() {
 }
 
 // ─── My Artists ──────────────────────────────────────────────────────────────
+
+function StashedArtistCard({
+  entry,
+  unstash,
+  unstashPending,
+}: {
+  entry: StashedArtistEntry;
+  unstash: (artistId: number) => void;
+  unstashPending: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const artist = entry.artist;
+  const initials = artist.name
+    .split(" ")
+    .map((w: string) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-border/40 bg-muted/50">
+      <div className="flex items-center gap-2 p-3">
+        <button
+          type="button"
+          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={expanded ? "Collapse details" : "Expand details"}
+        >
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 transition-transform",
+              expanded && "rotate-180",
+            )}
+          />
+        </button>
+        <Link
+          href={`/artists/${artist.id}`}
+          className="flex min-w-0 flex-1 items-center gap-3"
+        >
+          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20">
+            {artist.photoUrl ? (
+              <img
+                src={artist.photoUrl}
+                alt={artist.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <span className="font-clash text-sm font-bold text-primary/60">
+                  {initials}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 text-left">
+            <p className="truncate font-semibold">{artist.name}</p>
+            {!expanded &&
+              artist.vibeTags &&
+              artist.vibeTags.length > 0 && (
+                <p className="truncate text-xs text-muted-foreground">
+                  {artist.vibeTags.slice(0, 2).join(" · ")}
+                  {artist.vibeTags.length > 2 ? "…" : ""}
+                </p>
+              )}
+          </div>
+        </Link>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              aria-label={`Remove ${artist.name} from stash`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove {artist.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                They will be removed from My Artists. You can open their page and
+                tap Stash It again anytime.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={unstashPending}
+                onClick={() => unstash(artist.id)}
+              >
+                {unstashPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Remove"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+      {expanded && (
+        <div className="border-t border-border/40 px-3 pb-3 pt-2">
+          {artist.vibeTags && artist.vibeTags.length > 0 ? (
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {artist.vibeTags.join(" · ")}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">No vibe tags yet.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function MyArtists() {
   const { toast } = useToast();
@@ -694,7 +947,7 @@ function MyArtists() {
           <Mic2 className="w-12 h-12 text-muted-foreground/40 mb-4" />
           <h3 className="text-xl font-clash font-bold mb-2">No artists saved yet</h3>
           <p className="text-muted-foreground text-sm max-w-xs mb-5">
-            Visit an artist page and hit "Save to Stash".
+            Visit an artist page and tap Stash It.
           </p>
           <Link href="/artists">
             <Button variant="outline" className="rounded-full">
@@ -708,58 +961,14 @@ function MyArtists() {
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      {stashed.map((entry) => {
-        const artist = entry.artist;
-        const initials = artist.name
-          .split(" ")
-          .map((w: string) => w[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase();
-
-        return (
-          <div
-            key={entry.id}
-            className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/40 group"
-          >
-            <Link href={`/artists/${artist.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 flex-shrink-0">
-                {artist.photoUrl ? (
-                  <img
-                    src={artist.photoUrl}
-                    alt={artist.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <span className="font-clash text-sm font-bold text-primary/60">
-                      {initials}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold truncate">{artist.name}</p>
-                {artist.vibeTags && artist.vibeTags.length > 0 && (
-                  <p className="text-xs text-muted-foreground truncate">
-                    {artist.vibeTags.slice(0, 3).join(" · ")}
-                  </p>
-                )}
-              </div>
-            </Link>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-              disabled={unstashMutation.isPending}
-              onClick={() => unstashMutation.mutate({ artistId: artist.id })}
-              aria-label="Remove from Stash"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
-        );
-      })}
+      {stashed.map((entry) => (
+        <StashedArtistCard
+          key={entry.id}
+          entry={entry}
+          unstash={(artistId) => unstashMutation.mutate({ artistId })}
+          unstashPending={unstashMutation.isPending}
+        />
+      ))}
     </div>
   );
 }
@@ -784,39 +993,9 @@ function normalizeStashSectionOrder(
   return raw;
 }
 
-function Section({
-  icon: Icon,
-  title,
-  count,
-  children,
-  dragHandle,
-}: {
-  icon: ElementType;
-  title: string;
-  count?: number;
-  children: ReactNode;
-  dragHandle?: ReactNode;
-}) {
-  return (
-    <section className="space-y-4">
-      <div className="flex items-center gap-2">
-        {dragHandle}
-        <Icon className="w-5 h-5 text-primary" />
-        <h2 className="font-clash text-xl font-bold">{title}</h2>
-        {count !== undefined && (
-          <Badge variant="secondary" className="rounded-full text-xs">
-            {count}
-          </Badge>
-        )}
-      </div>
-      {children}
-    </section>
-  );
-}
-
 function SortableStashSection({
   id,
-  icon,
+  icon: Icon,
   title,
   count,
   children,
@@ -841,30 +1020,52 @@ function SortableStashSection({
     transition,
   };
 
+  const [sectionOpen, setSectionOpen] = useState(true);
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(isDragging && "opacity-60")}
     >
-      <Section
-        icon={icon}
-        title={title}
-        count={count}
-        dragHandle={
-          <button
-            type="button"
-            className="touch-none shrink-0 cursor-grab rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing"
-            aria-label="Drag to reorder section"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="h-5 w-5" />
-          </button>
-        }
-      >
-        {children}
-      </Section>
+      <section className="space-y-4">
+        <Collapsible open={sectionOpen} onOpenChange={setSectionOpen}>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <button
+              type="button"
+              className="touch-none shrink-0 cursor-grab rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing"
+              aria-label="Drag to reorder section"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="h-5 w-5" />
+            </button>
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 pl-1 pr-2 text-left hover:bg-muted/60 transition-colors"
+              >
+                <Icon className="h-5 w-5 shrink-0 text-primary" />
+                <h2 className="font-clash text-xl font-bold">{title}</h2>
+                {count !== undefined && (
+                  <Badge variant="secondary" className="rounded-full text-xs">
+                    {count}
+                  </Badge>
+                )}
+                <ChevronDown
+                  className={cn(
+                    "ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                    sectionOpen && "rotate-180",
+                  )}
+                />
+              </button>
+            </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent className="space-y-4 pt-1 data-[state=closed]:animate-none">
+            {children}
+          </CollapsibleContent>
+        </Collapsible>
+      </section>
     </div>
   );
 }
