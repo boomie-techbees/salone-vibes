@@ -3,8 +3,6 @@ import { SignIn, SignUp } from "@clerk/react";
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export function SignInPage() {
-  // To update login providers, app branding, or OAuth settings use the Auth
-  // pane in the workspace toolbar. More information can be found in the Replit docs.
   return (
     <div className="flex justify-center items-center min-h-[calc(100vh-8rem)] py-8 px-4">
       <div className="w-full max-w-md">
@@ -31,8 +29,6 @@ export function SignInPage() {
 }
 
 export function SignUpPage() {
-  // To update login providers, app branding, or OAuth settings use the Auth
-  // pane in the workspace toolbar. More information can be found in the Replit docs.
   return (
     <div className="flex justify-center items-center min-h-[calc(100vh-8rem)] py-8 px-4">
       <div className="w-full max-w-md">

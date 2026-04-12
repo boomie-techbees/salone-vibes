@@ -34,7 +34,7 @@ Built because no existing platform serves this community well, and because Famou
 | Backend | Node.js / Express |
 | Database | PostgreSQL |
 | AI features | Anthropic Claude API (claude-sonnet-4-6) |
-| Hosting | Replit |
+| Hosting | Railway |
 | Validation | Zod |
 
 ---

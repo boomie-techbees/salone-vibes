@@ -31,10 +31,7 @@ app.use(
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 const allowedOrigins: string[] | true = process.env.NODE_ENV === "production"
-  ? [
-      process.env.ALLOWED_ORIGIN,
-      process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : undefined,
-    ].filter((o): o is string => Boolean(o))
+  ? [process.env.ALLOWED_ORIGIN].filter((o): o is string => Boolean(o))
   : true;
 app.use(cors({ credentials: true, origin: allowedOrigins }));
 app.use(express.json({ limit: "25mb" }));

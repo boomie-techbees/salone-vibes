@@ -1,14 +1,11 @@
 /**
  * Clerk Frontend API Proxy Middleware
  *
- * Proxies Clerk Frontend API requests through your domain, enabling Clerk
- * authentication on custom domains and .replit.app deployments without
- * requiring CNAME DNS configuration.
+ * Proxies Clerk Frontend API requests through your domain so the browser can
+ * talk to Clerk on your own host (useful when you cannot point a CNAME at
+ * Clerk’s frontend API).
  *
- * AUTH CONFIGURATION: To manage users, enable/disable login providers
- * (Google, GitHub, etc.), change app branding, or configure OAuth credentials,
- * use the Auth pane in the workspace toolbar. There is no external Clerk
- * dashboard — all auth configuration is done through the Auth pane.
+ * Configure auth (providers, branding, OAuth) in the Clerk dashboard.
  *
  * IMPORTANT:
  * - Only active in production (Clerk proxying doesn't work for dev instances)
