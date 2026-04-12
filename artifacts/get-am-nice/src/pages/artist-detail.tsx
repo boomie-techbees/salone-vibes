@@ -183,6 +183,7 @@ function VibeTagsEditor({
   const [editing, setEditing] = useState(false);
   const [tags, setTags] = useState<string[]>(vibeTags ?? []);
   const [input, setInput] = useState("");
+  const [pendingRemoveTag, setPendingRemoveTag] = useState<string | null>(null);
   const { toast } = useToast();
 
   const update = useUpdateArtist({
@@ -274,8 +275,10 @@ function VibeTagsEditor({
             {tag}
             {editing && (
               <button
-                onClick={() => removeTag(tag)}
+                type="button"
+                onClick={() => setPendingRemoveTag(tag)}
                 className="ml-0.5 hover:text-destructive"
+                aria-label={`Remove tag ${tag}`}
               >
                 <X className="w-2.5 h-2.5" />
               </button>
@@ -286,6 +289,34 @@ function VibeTagsEditor({
           <span className="text-xs text-muted-foreground">No tags yet.</span>
         )}
       </div>
+
+      <AlertDialog
+        open={pendingRemoveTag !== null}
+        onOpenChange={(o) => !o && setPendingRemoveTag(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this tag?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingRemoveTag
+                ? `Remove "${pendingRemoveTag}" from the list. You can add it again before saving, or save to update the artist.`
+                : "Remove this tag from the list?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingRemoveTag !== null) removeTag(pendingRemoveTag);
+                setPendingRemoveTag(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {editing && (
         <div className="space-y-2">

@@ -42,7 +42,7 @@ Users with **`publicMetadata.role === "admin"`** in Clerk (and optional server *
 - **Add Artist** (AI-generated bio + vibe tags from name).
 - **Edit** artist bio, vibe tags, and links on the artist detail page.
 
-Non-admins see read-only artist fields. The API enforces the same rules for create/update artist routes.
+Non-admins see read-only artist fields. The API enforces the same rules for create/update artist routes. In the admin editors, **removing a vibe tag or link** asks for confirmation before it is dropped from the draft.
 
 ### Platform & quality
 
