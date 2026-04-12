@@ -29,7 +29,9 @@ import type {
   ListEventsParams,
   Song,
   StashArtistBody,
+  StashEventBody,
   StashedArtistEntry,
+  StashedEventEntry,
   SubmitEventBody,
   UpdateArtistBody,
   UpdateLexiconEntryBody,
@@ -1044,6 +1046,91 @@ export const useSubmitEvent = <
 > => {
   return useMutation(getSubmitEventMutationOptions(options));
 };
+
+/**
+ * @summary Get a single event by ID
+ */
+export const getGetEventUrl = (id: number) => {
+  return `/api/events/${id}`;
+};
+
+export const getEvent = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Event> => {
+  return customFetch<Event>(getGetEventUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEventQueryKey = (id: number) => {
+  return [`/api/events/${id}`] as const;
+};
+
+export const getGetEventQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEvent>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEvent>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetEventQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getEvent>>> = ({
+    signal,
+  }) => getEvent(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getEvent>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetEventQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEvent>>
+>;
+export type GetEventQueryError = ErrorType<void>;
+
+/**
+ * @summary Get a single event by ID
+ */
+
+export function useGetEvent<
+  TData = Awaited<ReturnType<typeof getEvent>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEvent>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEventQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Update an existing event (submitter or admin only)
@@ -2188,4 +2275,249 @@ export const useUnstashArtist = <
   TContext
 > => {
   return useMutation(getUnstashArtistMutationOptions(options));
+};
+
+/**
+ * @summary List events saved in the user's stash
+ */
+export const getListStashedEventsUrl = () => {
+  return `/api/stash/events`;
+};
+
+export const listStashedEvents = async (
+  options?: RequestInit,
+): Promise<StashedEventEntry[]> => {
+  return customFetch<StashedEventEntry[]>(getListStashedEventsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListStashedEventsQueryKey = () => {
+  return [`/api/stash/events`] as const;
+};
+
+export const getListStashedEventsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listStashedEvents>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listStashedEvents>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListStashedEventsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listStashedEvents>>
+  > = ({ signal }) => listStashedEvents({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listStashedEvents>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListStashedEventsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listStashedEvents>>
+>;
+export type ListStashedEventsQueryError = ErrorType<void>;
+
+/**
+ * @summary List events saved in the user's stash
+ */
+
+export function useListStashedEvents<
+  TData = Awaited<ReturnType<typeof listStashedEvents>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listStashedEvents>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListStashedEventsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Save an event to the user's stash
+ */
+export const getStashEventUrl = () => {
+  return `/api/stash/events`;
+};
+
+export const stashEvent = async (
+  stashEventBody: StashEventBody,
+  options?: RequestInit,
+): Promise<StashedEventEntry> => {
+  return customFetch<StashedEventEntry>(getStashEventUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(stashEventBody),
+  });
+};
+
+export const getStashEventMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof stashEvent>>,
+    TError,
+    { data: BodyType<StashEventBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof stashEvent>>,
+  TError,
+  { data: BodyType<StashEventBody> },
+  TContext
+> => {
+  const mutationKey = ["stashEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof stashEvent>>,
+    { data: BodyType<StashEventBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return stashEvent(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StashEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof stashEvent>>
+>;
+export type StashEventMutationBody = BodyType<StashEventBody>;
+export type StashEventMutationError = ErrorType<void>;
+
+/**
+ * @summary Save an event to the user's stash
+ */
+export const useStashEvent = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof stashEvent>>,
+    TError,
+    { data: BodyType<StashEventBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof stashEvent>>,
+  TError,
+  { data: BodyType<StashEventBody> },
+  TContext
+> => {
+  return useMutation(getStashEventMutationOptions(options));
+};
+
+/**
+ * @summary Remove an event from the user's stash
+ */
+export const getUnstashEventUrl = (eventId: number) => {
+  return `/api/stash/events/${eventId}`;
+};
+
+export const unstashEvent = async (
+  eventId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getUnstashEventUrl(eventId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getUnstashEventMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unstashEvent>>,
+    TError,
+    { eventId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unstashEvent>>,
+  TError,
+  { eventId: number },
+  TContext
+> => {
+  const mutationKey = ["unstashEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unstashEvent>>,
+    { eventId: number }
+  > = (props) => {
+    const { eventId } = props ?? {};
+
+    return unstashEvent(eventId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnstashEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unstashEvent>>
+>;
+
+export type UnstashEventMutationError = ErrorType<void>;
+
+/**
+ * @summary Remove an event from the user's stash
+ */
+export const useUnstashEvent = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unstashEvent>>,
+    TError,
+    { eventId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof unstashEvent>>,
+  TError,
+  { eventId: number },
+  TContext
+> => {
+  return useMutation(getUnstashEventMutationOptions(options));
 };

@@ -24,7 +24,70 @@ const ExtractedEventSchema = z.object({
   location: z.string().nullable().optional(),
   ticketUrl: z.string().nullable().optional(),
   artists: z.string().nullable().optional(),
+  /** Names and phone numbers from the flyer (appended into description on the client). */
+  contactPhones: z.string().nullable().optional(),
 });
+
+function firstNonEmptyString(...vals: unknown[]): string | undefined {
+  for (const v of vals) {
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (t) return t;
+    }
+    if (Array.isArray(v) && v.length > 0) {
+      const joined = v
+        .map((x) => (typeof x === "string" ? x.trim() : String(x)))
+        .filter(Boolean)
+        .join(" · ");
+      if (joined) return joined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Merge alternate keys into description / contactPhones before Zod parse (models vary).
+ * Pricing and admission tiers go into description — we do not store a separate admission field.
+ */
+function normalizeExtractedJson(parsed: unknown): unknown {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return parsed;
+  }
+  const o = { ...(parsed as Record<string, unknown>) };
+
+  const priceBlob = firstNonEmptyString(
+    o.admissionInfo,
+    o.admission_info,
+    o.pricing,
+    o.admission,
+    o.prices,
+    o.ticketPrices,
+    o.ticket_prices,
+    o.cost,
+    o.admissionPrice,
+    o.admission_price,
+    o.ticketPrice,
+  );
+  if (priceBlob) {
+    const desc = typeof o.description === "string" ? o.description.trim() : "";
+    o.description = [desc, priceBlob].filter(Boolean).join("\n\n") || priceBlob;
+  }
+
+  const phonesMerged = firstNonEmptyString(
+    o.contactPhones,
+    o.contact_phones,
+    o.phone,
+    o.phones,
+    o.contact,
+    o.contacts,
+    o.phoneNumbers,
+  );
+  if (phonesMerged) {
+    o.contactPhones = phonesMerged;
+  }
+
+  return o;
+}
 
 const router = Router();
 
@@ -69,16 +132,17 @@ router.post("/events/extract-flyer", async (req, res) => {
               text: `This is an event flyer. Extract every piece of information you can see and return it as a JSON object with these exact keys:
 {
   "title": "the event name or title (string or null)",
-  "description": "any tagline, description, or lineup details (string or null)",
+  "description": "promo text, presenter line, venue notes, AND all admission/pricing (every tier and dollar amount) and VIP perks — everything except phone numbers (string or null). Include prices verbatim, e.g. 'Regular admission: $120 · VIP: $150 (includes dinner & drinks)'.",
   "date": "the event date formatted as YYYY-MM-DD (string or null — if month/day only, use current year 2026)",
-  "time": "start time in 12h format like '8:00 PM' (string or null)",
+  "time": "start time in 12h format like '8:00 PM' (string or null — use null if no time is printed)",
   "venue": "the venue or club name (string or null)",
   "street": "the street address — building number and street name only, e.g. '8500 Annapolis Road' (string or null)",
   "city": "the city and state/province/zip if shown, e.g. 'New Carrollton, MD 20784' (string or null)",
   "country": "the country (string or null)",
   "location": "a combined short location string like 'Freetown, Sierra Leone' (string or null)",
-  "ticketUrl": "a ticket purchase URL if visible (string or null)",
-  "artists": "performing artists or DJs, comma-separated (string or null)"
+  "ticketUrl": "a ticket purchase URL ONLY if a full http(s) URL is visible on the flyer (string or null — do not invent URLs)",
+  "artists": "performing artists or DJs, comma-separated (string or null)",
+  "contactPhones": "every phone number with the name or label next to it on the flyer, e.g. 'Mabinty: (240) 481-7055 · Nabs: (240) 413-9922' (string or null)"
 }
 Return ONLY the JSON object, no commentary.`,
             },
@@ -107,7 +171,7 @@ Return ONLY the JSON object, no commentary.`,
     return res.status(500).json({ error: "Failed to parse AI response" });
   }
 
-  const validated = ExtractedEventSchema.safeParse(parsed);
+  const validated = ExtractedEventSchema.safeParse(normalizeExtractedJson(parsed));
   if (!validated.success) {
     console.error("[extract-flyer] schema validation error:", validated.error.issues, "parsed:", parsed);
     return res.status(500).json({ error: "AI response did not match expected format" });
@@ -158,6 +222,25 @@ router.get("/events/upcoming-preview", async (_req, res) => {
   return res.json(events);
 });
 
+router.get("/events/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: "Invalid event id" });
+  }
+
+  const [event] = await db
+    .select()
+    .from(eventsTable)
+    .where(eq(eventsTable.id, id))
+    .limit(1);
+
+  if (!event) {
+    return res.status(404).json({ error: "Event not found" });
+  }
+
+  return res.json(event);
+});
+
 router.post("/events", async (req, res) => {
   const parseResult = SubmitEventBody.safeParse(req.body);
   if (!parseResult.success) {
@@ -181,6 +264,7 @@ router.post("/events", async (req, res) => {
       eventDate: new Date(data.eventDate),
       venue: data.venue ?? null,
       ticketUrl: data.ticketUrl ?? null,
+      performingArtists: data.performingArtists ?? null,
       submittedBy: clerkUserId,
       approved: true,
     })
@@ -233,6 +317,7 @@ router.put("/events/:id", async (req, res) => {
       eventDate: new Date(data.eventDate),
       venue: data.venue ?? null,
       ticketUrl: data.ticketUrl ?? null,
+      performingArtists: data.performingArtists ?? null,
     })
     .where(eq(eventsTable.id, id))
     .returning();

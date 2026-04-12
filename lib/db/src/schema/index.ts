@@ -4,3 +4,4 @@ export * from "./events";
 export * from "./songs";
 export * from "./artists";
 export * from "./stashed_artists";
+export * from "./stashed_events";

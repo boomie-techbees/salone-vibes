@@ -5,7 +5,7 @@ import * as z from "zod";
 import { format } from "date-fns";
 import { MapPin, Calendar as CalendarIcon, Ticket, Plus, Upload, X, Sparkles, Loader2, Trash2, Pencil } from "lucide-react";
 
-import { useListEvents, useSubmitEvent, useUpdateEvent, useDeleteEvent, getListEventsQueryKey } from "@workspace/api-client-react";
+import { useListEvents, useSubmitEvent, useUpdateEvent, useDeleteEvent, getListEventsQueryKey, getGetEventQueryKey } from "@workspace/api-client-react";
 import type { Event } from "@workspace/api-client-react";
 import { useAuth, useUser } from "@clerk/react";
 import { Link } from "wouter";
@@ -22,6 +22,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { AiGeneratedContentNote } from "@/components/ai-generated-content-note";
+import { eventDetailHref, getEventAddressLines, getEventMapsQuery, getEventMapsUrl } from "@/lib/event-maps";
+import { EventStashButton } from "@/components/event-stash-button";
 
 const submitEventSchema = z.object({
   title: z.string().min(3, "Title is required"),
@@ -31,9 +33,21 @@ const submitEventSchema = z.object({
   eventDate: z.string().min(1, "Date is required"),
   venue: z.string().optional(),
   ticketUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  performingArtists: z.string().optional(),
 });
 
 type SubmitEventValues = z.infer<typeof submitEventSchema>;
+
+const EMPTY_SUBMIT_EVENT_VALUES: SubmitEventValues = {
+  title: "",
+  description: "",
+  location: "",
+  address: "",
+  eventDate: "",
+  venue: "",
+  ticketUrl: "",
+  performingArtists: "",
+};
 
 type ExtractedFields = {
   title?: string | null;
@@ -47,6 +61,8 @@ type ExtractedFields = {
   location?: string | null;
   ticketUrl?: string | null;
   artists?: string | null;
+  /** Shown in description (no separate DB field for phones). */
+  contactPhones?: string | null;
 };
 
 const MAX_IMAGE_PX = 1200;
@@ -145,7 +161,6 @@ function FlyerUpload({
         const data: ExtractedFields = await res.json();
         onExtracted(data);
         setExtracted(true);
-        toast({ title: "Flyer scanned!", description: "Details filled in below — review and edit before submitting." });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Could not extract details";
         setError(msg);
@@ -236,9 +251,23 @@ function FlyerUpload({
   );
 }
 
+function editEventToFormValues(event: Event): SubmitEventValues {
+  return {
+    title: event.title,
+    description: event.description ?? "",
+    location: event.location,
+    address: event.city ?? "",
+    eventDate: String(event.eventDate).slice(0, 10),
+    venue: event.venue ?? "",
+    ticketUrl: event.ticketUrl ?? "",
+    performingArtists: event.performingArtists ?? "",
+  };
+}
+
 function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.ReactNode; eventToEdit?: Event; onClose?: () => void }) {
   const isEditing = !!eventToEdit;
   const [open, setOpen] = useState(isEditing);
+  const [flyerResetKey, setFlyerResetKey] = useState(0);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { isSignedIn } = useAuth();
@@ -247,23 +276,7 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
 
   const form = useForm<SubmitEventValues>({
     resolver: zodResolver(submitEventSchema),
-    defaultValues: isEditing ? {
-      title: eventToEdit.title,
-      description: eventToEdit.description ?? "",
-      location: eventToEdit.location,
-      address: eventToEdit.city ?? "",
-      eventDate: String(eventToEdit.eventDate).slice(0, 10),
-      venue: eventToEdit.venue ?? "",
-      ticketUrl: eventToEdit.ticketUrl ?? "",
-    } : {
-      title: "",
-      description: "",
-      location: "",
-      address: "",
-      eventDate: "",
-      venue: "",
-      ticketUrl: "",
-    },
+    defaultValues: isEditing ? editEventToFormValues(eventToEdit) : EMPTY_SUBMIT_EVENT_VALUES,
   });
 
   const handleExtracted = useCallback(
@@ -278,10 +291,21 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
       };
 
       set("title", data.title);
-      set("description", data.artists ? `${data.artists}${data.description ? ` · ${data.description}` : ""}` : data.description);
+      set("performingArtists", data.artists);
       set("venue", data.venue);
       set("eventDate", toDateInputValue(data.date));
       set("ticketUrl", data.ticketUrl);
+
+      const contactBlock = data.contactPhones?.trim()
+        ? `Contact: ${data.contactPhones.trim()}`
+        : "";
+      const baseDesc = data.description?.trim() ?? "";
+      const timeNote = data.time?.trim() ? `Time: ${data.time.trim()}` : "";
+      const descCombined = [baseDesc, timeNote, contactBlock].filter(Boolean).join("\n\n");
+      if (descCombined) {
+        form.setValue("description", descCombined, { shouldDirty: true });
+        filled.add("description");
+      }
 
       const line1 = data.street || "";
       const line2 = [data.city, data.country].filter(Boolean).join(", ");
@@ -303,11 +327,24 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
   );
 
   const handleClear = useCallback(() => {
-    form.reset();
+    if (isEditing && eventToEdit) {
+      form.reset(editEventToFormValues(eventToEdit));
+    } else {
+      form.reset(EMPTY_SUBMIT_EVENT_VALUES);
+    }
     setAutoFilledFields(new Set());
+  }, [form, isEditing, eventToEdit]);
+
+  const resetAddDialogUi = useCallback(() => {
+    form.reset(EMPTY_SUBMIT_EVENT_VALUES);
+    setAutoFilledFields(new Set());
+    setFlyerResetKey((k) => k + 1);
   }, [form]);
 
   const handleClose = () => {
+    if (!isEditing) {
+      resetAddDialogUi();
+    }
     setOpen(false);
     onClose?.();
   };
@@ -323,6 +360,7 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
           onSuccess: () => {
             toast({ title: "Event Updated!", description: "Your changes have been saved." });
             queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
+            queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventToEdit.id) });
             handleClose();
           },
           onError: () => {
@@ -337,8 +375,9 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
           onSuccess: () => {
             toast({ title: "Event Submitted!", description: "Your event has been added to the community calendar." });
             setOpen(false);
-            form.reset();
+            form.reset(EMPTY_SUBMIT_EVENT_VALUES);
             setAutoFilledFields(new Set());
+            setFlyerResetKey((k) => k + 1);
             queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
           },
           onError: () => {
@@ -373,7 +412,13 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); else setOpen(true); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) handleClose();
+        else setOpen(true);
+      }}
+    >
       {!isEditing && (
         <DialogTrigger asChild>
           {trigger || (
@@ -394,7 +439,7 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
         </DialogHeader>
 
         <div className="space-y-5 mt-2">
-          <FlyerUpload onExtracted={handleExtracted} onClear={handleClear} />
+          <FlyerUpload key={flyerResetKey} onExtracted={handleExtracted} onClear={handleClear} />
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -507,16 +552,16 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
 
               <FormField
                 control={form.control}
-                name="description"
+                name="performingArtists"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
-                      Description / Artists
-                      {isAutoFilled("description") && <AutoBadge />}
+                      Artists / lineup
+                      {isAutoFilled("performingArtists") && <AutoBadge />}
                     </FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Artists, lineup, or event details…"
+                        placeholder="Names or lineup (one per line or comma-separated)…"
                         className="resize-none h-20"
                         {...field}
                       />
@@ -526,7 +571,28 @@ function SubmitEventDialog({ trigger, eventToEdit, onClose }: { trigger?: React.
                 )}
               />
 
-              <AiGeneratedContentNote className="border-t border-border/30 pt-4 mt-1" />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      Description
+                      {isAutoFilled("description") && <AutoBadge />}
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Event details, notes…"
+                        className="resize-none h-20"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <AiGeneratedContentNote variant="confirm" className="border-t border-border/30 pt-4 mt-1" />
 
               <div className="pt-2 flex justify-end gap-3">
                 <Button type="button" variant="ghost" onClick={handleClose}>
@@ -588,6 +654,7 @@ function DeleteEventButton({ eventId, eventTitle }: { eventId: number; eventTitl
     deleteMutation.mutate({ id: eventId }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
+        queryClient.removeQueries({ queryKey: getGetEventQueryKey(eventId) });
         toast({ title: "Event deleted", description: `"${eventTitle}" has been removed.` });
       },
       onError: () => {
@@ -679,73 +746,87 @@ export function Events() {
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {events.map((event) => (
-            <Card key={event.id} className="overflow-hidden hover:shadow-md transition-all border-border/60 hover:border-primary/40 flex flex-col">
-              <div className="bg-primary/5 p-6 border-b border-border/50 relative overflow-hidden">
-                <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full blur-xl" />
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-primary font-bold uppercase tracking-wider text-sm mb-1">
-                      {format(new Date(String(event.eventDate).slice(0, 10) + "T12:00:00"), "MMM dd, yyyy")}
-                    </span>
-                    <h3 className="font-clash text-2xl font-bold text-foreground leading-tight line-clamp-2">
-                      {event.title}
-                    </h3>
-                  </div>
+          {events.map((event) => {
+            const addressLines = getEventAddressLines(event);
+            const mapsUrl = getEventMapsUrl(event);
+            const hasMaps = getEventMapsQuery(event).length > 0;
+            return (
+              <Card key={event.id} className="overflow-hidden hover:shadow-md transition-all border-border/60 hover:border-primary/40 flex flex-col relative">
+                <div
+                  className="absolute top-4 right-4 z-20 flex items-center gap-1"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                >
+                  <EventStashButton eventId={event.id} compact />
                   {(isAdminUser || (currentClerkId && currentClerkId === event.submittedBy)) && (
-                    <div className="shrink-0 pt-0.5 flex gap-1">
+                    <>
                       <EditEventButton event={event} />
                       <DeleteEventButton eventId={event.id} eventTitle={event.title} />
-                    </div>
+                    </>
                   )}
                 </div>
-              </div>
-
-              <CardContent className="p-6 flex-1 flex flex-col gap-4">
-                <div className="flex items-start gap-3 text-muted-foreground">
-                  <MapPin className="w-5 h-5 shrink-0 mt-0.5 text-secondary" />
-                  <div className="text-sm">
-                    {(() => {
-                      const storedAddress = (event.city || "").trim();
-                      const addressLines = storedAddress
-                        ? storedAddress.split("\n").map((l) => l.trim()).filter(Boolean)
-                        : [event.location || ""].filter(Boolean);
-                      const mapsQuery = [event.venue, storedAddress.replace(/\n/g, ", "), event.country]
-                        .filter(Boolean).join(", ") || event.location || "";
-                      const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(mapsQuery)}`;
-                      const hasAddress = mapsQuery.length > 0;
-                      const content = (
-                        <>
-                          <p className="font-medium text-foreground group-hover/map:text-primary transition-colors">{event.venue || "Venue TBA"}</p>
-                          {addressLines.map((line, i) => (
-                            <p key={i} className="group-hover/map:text-primary transition-colors underline-offset-2 group-hover/map:underline">{line}</p>
-                          ))}
-                        </>
-                      );
-                      return hasAddress ? (
-                        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="group/map">{content}</a>
-                      ) : (
-                        <div>{content}</div>
-                      );
-                    })()}
+                <Link
+                  href={eventDetailHref(event.id)}
+                  className="flex flex-col flex-1 min-h-0 text-inherit no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-t-xl"
+                  aria-label={`${event.title} — view event details`}
+                >
+                  <div className="bg-primary/5 p-6 border-b border-border/50 relative overflow-hidden">
+                    <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full blur-xl" />
+                    <div className="flex items-start gap-2 pr-24">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-primary font-bold uppercase tracking-wider text-sm mb-1">
+                          {format(new Date(String(event.eventDate).slice(0, 10) + "T12:00:00"), "MMM dd, yyyy")}
+                        </span>
+                        <h3 className="font-clash text-2xl font-bold text-foreground leading-tight line-clamp-2">
+                          {event.title}
+                        </h3>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                {event.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-3 mt-2">{event.description}</p>
-                )}
-              </CardContent>
 
-              <CardFooter className="p-6 pt-0 mt-auto">
-                {event.ticketUrl && (
-                  <Button asChild className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-bold group-hover:shadow-md transition-all">
-                    <a href={event.ticketUrl} target="_blank" rel="noopener noreferrer">
-                      <Ticket className="w-4 h-4 mr-2" /> Get Tickets
-                    </a>
-                  </Button>
-                )}
-              </CardFooter>
-            </Card>
-          ))}
+                  <CardContent className="p-6 flex-1 flex flex-col gap-4">
+                    <div className="flex items-start gap-3 text-muted-foreground">
+                      <MapPin className="w-5 h-5 shrink-0 mt-0.5 text-secondary" />
+                      <div className="text-sm">
+                        {(() => {
+                          const content = (
+                            <>
+                              <p className="font-medium text-foreground group-hover/map:text-primary transition-colors">{event.venue || "Venue TBA"}</p>
+                              {addressLines.map((line, i) => (
+                                <p key={i} className="group-hover/map:text-primary transition-colors underline-offset-2 group-hover/map:underline">{line}</p>
+                              ))}
+                            </>
+                          );
+                          return hasMaps ? (
+                            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="group/map" onClick={(e) => e.stopPropagation()}>
+                              {content}
+                            </a>
+                          ) : (
+                            <div>{content}</div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                    {event.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-3 mt-2">{event.description}</p>
+                    )}
+                  </CardContent>
+                </Link>
+
+                <CardFooter className="p-6 pt-0 mt-auto flex flex-col gap-2">
+                  {event.ticketUrl && (
+                    <Button asChild className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-bold group-hover:shadow-md transition-all">
+                      <a href={event.ticketUrl} target="_blank" rel="noopener noreferrer">
+                        <Ticket className="w-4 h-4 mr-2" /> Get Tickets
+                      </a>
+                    </Button>
+                  )}
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

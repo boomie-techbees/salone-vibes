@@ -19,7 +19,7 @@ tags:
   - name: artists
     description: Salone music artists
   - name: stash
-    description: Personal stash — saved artists
+    description: Personal stash — saved artists and events
 paths:
   /healthz:
     get:
@@ -264,6 +264,25 @@ paths:
           description: Bad request
 
   /events/{id}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Get a single event by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "404":
+          description: Not found
     put:
       operationId: updateEvent
       tags: [events]
@@ -563,6 +582,73 @@ paths:
         "404":
           description: Not found
 
+  /stash/events:
+    get:
+      operationId: listStashedEvents
+      tags: [stash]
+      summary: List events saved in the user's stash
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Stashed events with full event details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StashedEventEntry"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: stashEvent
+      tags: [stash]
+      summary: Save an event to the user's stash
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StashEventBody"
+      responses:
+        "201":
+          description: Event stashed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StashedEventEntry"
+        "400":
+          description: Bad request
+        "401":
+          description: Unauthorized
+        "404":
+          description: Event not found
+        "409":
+          description: Already stashed
+
+  /stash/events/{eventId}:
+    delete:
+      operationId: unstashEvent
+      tags: [stash]
+      summary: Remove an event from the user's stash
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
 components:
   securitySchemes:
     clerkAuth:
@@ -596,7 +682,7 @@ components:
           description: Order of My Stash sections; each value appears once
           items:
             type: string
-            enum: [lexicon, artists, songs]
+            enum: [events, lexicon, artists, songs]
         createdAt:
           type: string
           format: date-time
@@ -611,12 +697,12 @@ components:
       properties:
         order:
           type: array
-          minItems: 3
-          maxItems: 3
+          minItems: 4
+          maxItems: 4
           uniqueItems: true
           items:
             type: string
-            enum: [lexicon, artists, songs]
+            enum: [events, lexicon, artists, songs]
 
     UpdateProfileBody:
       type: object
@@ -776,6 +862,10 @@ components:
         ticketUrl:
           type: string
           nullable: true
+        performingArtists:
+          type: string
+          nullable: true
+          description: Performing artists or DJs (free text or comma-separated)
         submittedBy:
           type: string
           nullable: true
@@ -815,6 +905,9 @@ components:
           type: string
           nullable: true
         ticketUrl:
+          type: string
+          nullable: true
+        performingArtists:
           type: string
           nullable: true
         submittedBy:
@@ -982,3 +1075,30 @@ components:
           type: integer
       required:
         - artistId
+
+    StashedEventEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Stash entry id
+        eventId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        event:
+          $ref: "#/components/schemas/Event"
+      required:
+        - id
+        - eventId
+        - createdAt
+        - event
+
+    StashEventBody:
+      type: object
+      properties:
+        eventId:
+          type: integer
+      required:
+        - eventId

@@ -7,7 +7,7 @@ export const usersTable = pgTable("users", {
   clerkUserId: text("clerk_user_id").notNull().unique(),
   displayName: text("display_name"),
   email: text("email"),
-  /** Permutation of lexicon / artists / songs for My Stash section order; null = default order. */
+  /** Permutation of events / lexicon / artists / songs for My Stash section order; null = default order. */
   stashSectionOrder: jsonb("stash_section_order").$type<string[] | null>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

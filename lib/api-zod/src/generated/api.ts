@@ -24,7 +24,7 @@ export const GetProfileResponse = zod.object({
   displayName: zod.string().nullish(),
   email: zod.string().nullish(),
   stashSectionOrder: zod
-    .array(zod.enum(["lexicon", "artists", "songs"]))
+    .array(zod.enum(["events", "lexicon", "artists", "songs"]))
     .nullish()
     .describe("Order of My Stash sections; each value appears once"),
   createdAt: zod.coerce.date(),
@@ -43,7 +43,7 @@ export const UpdateProfileResponse = zod.object({
   displayName: zod.string().nullish(),
   email: zod.string().nullish(),
   stashSectionOrder: zod
-    .array(zod.enum(["lexicon", "artists", "songs"]))
+    .array(zod.enum(["events", "lexicon", "artists", "songs"]))
     .nullish()
     .describe("Order of My Stash sections; each value appears once"),
   createdAt: zod.coerce.date(),
@@ -52,12 +52,12 @@ export const UpdateProfileResponse = zod.object({
 /**
  * @summary Persist order of My Stash sections (drag-and-drop)
  */
-export const updateStashSectionOrderBodyOrderMin = 3;
-export const updateStashSectionOrderBodyOrderMax = 3;
+export const updateStashSectionOrderBodyOrderMin = 4;
+export const updateStashSectionOrderBodyOrderMax = 4;
 
 export const UpdateStashSectionOrderBody = zod.object({
   order: zod
-    .array(zod.enum(["lexicon", "artists", "songs"]))
+    .array(zod.enum(["events", "lexicon", "artists", "songs"]))
     .min(updateStashSectionOrderBodyOrderMin)
     .max(updateStashSectionOrderBodyOrderMax),
 });
@@ -68,7 +68,7 @@ export const UpdateStashSectionOrderResponse = zod.object({
   displayName: zod.string().nullish(),
   email: zod.string().nullish(),
   stashSectionOrder: zod
-    .array(zod.enum(["lexicon", "artists", "songs"]))
+    .array(zod.enum(["events", "lexicon", "artists", "songs"]))
     .nullish()
     .describe("Order of My Stash sections; each value appears once"),
   createdAt: zod.coerce.date(),
@@ -188,6 +188,10 @@ export const ListEventsResponseItem = zod.object({
   eventDate: zod.coerce.date(),
   venue: zod.string().nullish(),
   ticketUrl: zod.string().nullish(),
+  performingArtists: zod
+    .string()
+    .nullish()
+    .describe("Performing artists or DJs (free text or comma-separated)"),
   submittedBy: zod.string().nullish(),
   approved: zod.boolean(),
   createdAt: zod.coerce.date(),
@@ -206,7 +210,34 @@ export const SubmitEventBody = zod.object({
   eventDate: zod.coerce.date(),
   venue: zod.string().nullish(),
   ticketUrl: zod.string().nullish(),
+  performingArtists: zod.string().nullish(),
   submittedBy: zod.string().nullish(),
+});
+
+/**
+ * @summary Get a single event by ID
+ */
+export const GetEventParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEventResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  location: zod.string(),
+  city: zod.string().nullish(),
+  country: zod.string().nullish(),
+  eventDate: zod.coerce.date(),
+  venue: zod.string().nullish(),
+  ticketUrl: zod.string().nullish(),
+  performingArtists: zod
+    .string()
+    .nullish()
+    .describe("Performing artists or DJs (free text or comma-separated)"),
+  submittedBy: zod.string().nullish(),
+  approved: zod.boolean(),
+  createdAt: zod.coerce.date(),
 });
 
 /**
@@ -225,6 +256,7 @@ export const UpdateEventBody = zod.object({
   eventDate: zod.coerce.date(),
   venue: zod.string().nullish(),
   ticketUrl: zod.string().nullish(),
+  performingArtists: zod.string().nullish(),
   submittedBy: zod.string().nullish(),
 });
 
@@ -238,6 +270,10 @@ export const UpdateEventResponse = zod.object({
   eventDate: zod.coerce.date(),
   venue: zod.string().nullish(),
   ticketUrl: zod.string().nullish(),
+  performingArtists: zod
+    .string()
+    .nullish()
+    .describe("Performing artists or DJs (free text or comma-separated)"),
   submittedBy: zod.string().nullish(),
   approved: zod.boolean(),
   createdAt: zod.coerce.date(),
@@ -263,6 +299,10 @@ export const GetUpcomingEventsPreviewResponseItem = zod.object({
   eventDate: zod.coerce.date(),
   venue: zod.string().nullish(),
   ticketUrl: zod.string().nullish(),
+  performingArtists: zod
+    .string()
+    .nullish()
+    .describe("Performing artists or DJs (free text or comma-separated)"),
   submittedBy: zod.string().nullish(),
   approved: zod.boolean(),
   createdAt: zod.coerce.date(),
@@ -461,4 +501,48 @@ export const StashArtistBody = zod.object({
  */
 export const UnstashArtistParams = zod.object({
   artistId: zod.coerce.number(),
+});
+
+/**
+ * @summary List events saved in the user's stash
+ */
+export const ListStashedEventsResponseItem = zod.object({
+  id: zod.number().describe("Stash entry id"),
+  eventId: zod.number(),
+  createdAt: zod.coerce.date(),
+  event: zod.object({
+    id: zod.number(),
+    title: zod.string(),
+    description: zod.string().nullish(),
+    location: zod.string(),
+    city: zod.string().nullish(),
+    country: zod.string().nullish(),
+    eventDate: zod.coerce.date(),
+    venue: zod.string().nullish(),
+    ticketUrl: zod.string().nullish(),
+    performingArtists: zod
+      .string()
+      .nullish()
+      .describe("Performing artists or DJs (free text or comma-separated)"),
+    submittedBy: zod.string().nullish(),
+    approved: zod.boolean(),
+    createdAt: zod.coerce.date(),
+  }),
+});
+export const ListStashedEventsResponse = zod.array(
+  ListStashedEventsResponseItem,
+);
+
+/**
+ * @summary Save an event to the user's stash
+ */
+export const StashEventBody = zod.object({
+  eventId: zod.number(),
+});
+
+/**
+ * @summary Remove an event from the user's stash
+ */
+export const UnstashEventParams = zod.object({
+  eventId: zod.coerce.number(),
 });

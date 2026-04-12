@@ -6,6 +6,7 @@ import { Link } from "wouter";
 import { Show, useAuth } from "@clerk/react";
 import {
   BookOpen,
+  Calendar,
   ChevronRight,
   PenLine,
   Trash2,
@@ -19,6 +20,7 @@ import {
   GripVertical,
   ChevronDown,
 } from "lucide-react";
+import { format } from "date-fns";
 
 import {
   DndContext,
@@ -51,6 +53,9 @@ import {
   useListStashedArtists,
   useUnstashArtist,
   getListStashedArtistsQueryKey,
+  useListStashedEvents,
+  useUnstashEvent,
+  getListStashedEventsQueryKey,
   useGetProfile,
   getGetProfileQueryKey,
   useUpdateStashSectionOrder,
@@ -59,11 +64,13 @@ import type {
   LexiconEntry,
   Song,
   StashedArtistEntry,
+  StashedEventEntry,
   UserProfileStashSectionOrderItem,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import { eventDetailHref } from "@/lib/event-maps";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -792,6 +799,139 @@ function SongsILove() {
   );
 }
 
+// ─── My Events ───────────────────────────────────────────────────────────────
+
+function StashedEventCard({
+  entry,
+  unstash,
+  unstashPending,
+}: {
+  entry: StashedEventEntry;
+  unstash: (eventId: number) => void;
+  unstashPending: boolean;
+}) {
+  const ev = entry.event;
+  const dateLabel = format(
+    new Date(String(ev.eventDate).slice(0, 10) + "T12:00:00"),
+    "MMM d, yyyy",
+  );
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-border/40 bg-muted/50">
+      <div className="flex items-center gap-2 p-3">
+        <Link
+          href={eventDetailHref(ev.id)}
+          className="flex min-w-0 flex-1 flex-col gap-0.5 text-left"
+        >
+          <p className="truncate font-semibold">{ev.title}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {dateLabel}
+            {ev.venue ? ` · ${ev.venue}` : ""}
+          </p>
+        </Link>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              aria-label={`Remove ${ev.title} from stash`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove {ev.title}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                It will be removed from My Events. You can open the event page and
+                tap Stash It again anytime.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={unstashPending}
+                onClick={() => unstash(ev.id)}
+              >
+                {unstashPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Remove"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </div>
+  );
+}
+
+function MyEvents() {
+  const { toast } = useToast();
+  const { data: stashed = [], isLoading } = useListStashedEvents({
+    query: { queryKey: getListStashedEventsQueryKey() },
+  });
+
+  const unstashMutation = useUnstashEvent({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: getListStashedEventsQueryKey(),
+        });
+        toast({ title: "Removed from Stash" });
+      },
+      onError: () =>
+        toast({ variant: "destructive", title: "Couldn't remove event" }),
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-20 rounded-xl bg-muted/60 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (stashed.length === 0) {
+    return (
+      <Card className="border-dashed border-2 bg-transparent">
+        <CardContent className="p-10 text-center flex flex-col items-center">
+          <Calendar className="w-12 h-12 text-muted-foreground/40 mb-4" />
+          <h3 className="text-xl font-clash font-bold mb-2">No events saved yet</h3>
+          <p className="text-muted-foreground text-sm max-w-xs mb-5">
+            Browse the calendar and tap Stash It on any event you don&apos;t want to
+            miss.
+          </p>
+          <Link href="/events">
+            <Button variant="outline" className="rounded-full">
+              Browse Events
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {stashed.map((entry) => (
+        <StashedEventCard
+          key={entry.id}
+          entry={entry}
+          unstash={(eventId) => unstashMutation.mutate({ eventId })}
+          unstashPending={unstashMutation.isPending}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ─── My Artists ──────────────────────────────────────────────────────────────
 
 function StashedArtistCard({
@@ -975,22 +1115,43 @@ function MyArtists() {
 
 // ─── Section wrapper ─────────────────────────────────────────────────────────
 
-const DEFAULT_STASH_SECTION_ORDER: UserProfileStashSectionOrderItem[] = [
+const STASH_SECTION_IDS: UserProfileStashSectionOrderItem[] = [
+  "events",
   "lexicon",
   "artists",
   "songs",
 ];
 
+const DEFAULT_STASH_SECTION_ORDER: UserProfileStashSectionOrderItem[] = [
+  ...STASH_SECTION_IDS,
+];
+
 function normalizeStashSectionOrder(
   raw: UserProfileStashSectionOrderItem[] | null | undefined,
 ): UserProfileStashSectionOrderItem[] {
-  if (!raw || raw.length !== 3) return [...DEFAULT_STASH_SECTION_ORDER];
-  const set = new Set(raw);
-  if (set.size !== 3) return [...DEFAULT_STASH_SECTION_ORDER];
-  for (const v of DEFAULT_STASH_SECTION_ORDER) {
-    if (!set.has(v)) return [...DEFAULT_STASH_SECTION_ORDER];
+  if (!raw || !Array.isArray(raw)) return [...DEFAULT_STASH_SECTION_ORDER];
+
+  const asSet = new Set(raw);
+  if (
+    raw.length === 4 &&
+    asSet.size === 4 &&
+    STASH_SECTION_IDS.every((id) => asSet.has(id))
+  ) {
+    return raw;
   }
-  return raw;
+
+  if (raw.length === 3 && asSet.size === 3) {
+    const legacy = new Set<UserProfileStashSectionOrderItem>([
+      "lexicon",
+      "artists",
+      "songs",
+    ]);
+    if (raw.every((x): x is UserProfileStashSectionOrderItem => legacy.has(x))) {
+      return ["events", ...raw];
+    }
+  }
+
+  return [...DEFAULT_STASH_SECTION_ORDER];
 }
 
 function SortableStashSection({
@@ -1080,8 +1241,8 @@ function SignInPrompt() {
       </div>
       <h2 className="font-clash text-3xl font-bold mb-3">Your Stash</h2>
       <p className="text-muted-foreground max-w-sm mb-8 leading-relaxed">
-        Sign in to save words to your lexicon, build your playlist, and follow
-        your favourite artists.
+        Sign in to save words to your lexicon, stash events, build your playlist,
+        and follow your favourite artists.
       </p>
       <div className="flex gap-3">
         <Link href="/sign-in">
@@ -1154,7 +1315,7 @@ function StashContent() {
             My Stash
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Your saved words, artists, and songs
+            Your saved events, words, artists, and songs
           </p>
           <p className="text-muted-foreground text-xs mt-1.5">
             Drag the grip beside a heading to reorder sections. Order is saved
@@ -1174,6 +1335,15 @@ function StashContent() {
               key={sectionId}
               className={cn(index > 0 && "border-t border-border/40 pt-10")}
             >
+              {sectionId === "events" && (
+                <SortableStashSection
+                  id={sectionId}
+                  icon={Calendar}
+                  title="My Events"
+                >
+                  <MyEvents />
+                </SortableStashSection>
+              )}
               {sectionId === "lexicon" && (
                 <SortableStashSection
                   id={sectionId}

@@ -12,6 +12,8 @@ export const eventsTable = pgTable("events", {
   eventDate: timestamp("event_date").notNull(),
   venue: text("venue"),
   ticketUrl: text("ticket_url"),
+  /** Comma-separated or free-text lineup (optional). */
+  performingArtists: text("performing_artists"),
   submittedBy: text("submitted_by"),
   approved: boolean("approved").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),

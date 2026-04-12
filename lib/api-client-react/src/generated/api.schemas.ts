@@ -13,6 +13,7 @@ export type UserProfileStashSectionOrderItem =
   (typeof UserProfileStashSectionOrderItem)[keyof typeof UserProfileStashSectionOrderItem];
 
 export const UserProfileStashSectionOrderItem = {
+  events: "events",
   lexicon: "lexicon",
   artists: "artists",
   songs: "songs",
@@ -32,6 +33,7 @@ export type UpdateStashSectionOrderBodyOrderItem =
   (typeof UpdateStashSectionOrderBodyOrderItem)[keyof typeof UpdateStashSectionOrderBodyOrderItem];
 
 export const UpdateStashSectionOrderBodyOrderItem = {
+  events: "events",
   lexicon: "lexicon",
   artists: "artists",
   songs: "songs",
@@ -39,8 +41,8 @@ export const UpdateStashSectionOrderBodyOrderItem = {
 
 export interface UpdateStashSectionOrderBody {
   /**
-   * @minItems 3
-   * @maxItems 3
+   * @minItems 4
+   * @maxItems 4
    */
   order: UpdateStashSectionOrderBodyOrderItem[];
 }
@@ -106,6 +108,8 @@ export interface Event {
   eventDate: string;
   venue?: string | null;
   ticketUrl?: string | null;
+  /** Performing artists or DJs (free text or comma-separated) */
+  performingArtists?: string | null;
   submittedBy?: string | null;
   approved: boolean;
   createdAt: string;
@@ -120,6 +124,7 @@ export interface SubmitEventBody {
   eventDate: string;
   venue?: string | null;
   ticketUrl?: string | null;
+  performingArtists?: string | null;
   submittedBy?: string | null;
 }
 
@@ -185,6 +190,18 @@ export interface StashedArtistEntry {
 
 export interface StashArtistBody {
   artistId: number;
+}
+
+export interface StashedEventEntry {
+  /** Stash entry id */
+  id: number;
+  eventId: number;
+  createdAt: string;
+  event: Event;
+}
+
+export interface StashEventBody {
+  eventId: number;
 }
 
 export type ListEventsParams = {

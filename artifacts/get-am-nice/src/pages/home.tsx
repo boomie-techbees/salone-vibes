@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { AiGeneratedContentNote } from "@/components/ai-generated-content-note";
 import { BookA, Calendar, ArrowRight, Loader2, Music } from "lucide-react";
 import { format } from "date-fns";
+import { eventDetailHref } from "@/lib/event-maps";
+import { EventStashButton } from "@/components/event-stash-button";
 
 export function Home() {
   return (
@@ -189,26 +191,43 @@ function UpcomingEventsPreview() {
   return (
     <div className="space-y-4">
       {events.map((event) => (
-        <Card key={event.id} className="overflow-hidden hover:shadow-md transition-shadow group border-border/50">
-          <CardContent className="p-0 flex">
-            <div className="bg-secondary/10 w-24 flex flex-col items-center justify-center p-2 text-center border-r border-border/50">
-              <span className="text-xs font-bold text-secondary uppercase tracking-widest">
-                {format(new Date(String(event.eventDate).slice(0, 10) + "T12:00:00"), "MMM")}
-              </span>
-              <span className="text-2xl font-clash font-bold text-secondary">
-                {format(new Date(String(event.eventDate).slice(0, 10) + "T12:00:00"), "dd")}
-              </span>
-            </div>
-            <div className="p-4 flex-1">
-              <h3 className="font-bold text-lg leading-tight mb-1 group-hover:text-primary transition-colors">
-                {event.title}
-              </h3>
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                {event.venue && `${event.venue}, `}{event.city || event.location}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <div key={event.id} className="relative">
+          <Link
+            href={eventDetailHref(event.id)}
+            className="block text-inherit no-underline rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            aria-label={`${event.title} — view event details`}
+          >
+            <Card className="overflow-hidden hover:shadow-md transition-shadow group border-border/50 cursor-pointer rounded-xl">
+              <CardContent className="p-0 flex">
+                <div className="bg-secondary/10 w-24 flex flex-col items-center justify-center p-2 text-center border-r border-border/50">
+                  <span className="text-xs font-bold text-secondary uppercase tracking-widest">
+                    {format(new Date(String(event.eventDate).slice(0, 10) + "T12:00:00"), "MMM")}
+                  </span>
+                  <span className="text-2xl font-clash font-bold text-secondary">
+                    {format(new Date(String(event.eventDate).slice(0, 10) + "T12:00:00"), "dd")}
+                  </span>
+                </div>
+                <div className="p-4 flex-1 pr-14">
+                  <h3 className="font-bold text-lg leading-tight mb-1 group-hover:text-primary transition-colors">
+                    {event.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    {event.venue && `${event.venue}, `}{event.city || event.location}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <div
+            className="absolute top-2 right-2 z-10"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <EventStashButton eventId={event.id} compact />
+          </div>
+        </div>
       ))}
     </div>
   );
