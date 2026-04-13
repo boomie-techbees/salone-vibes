@@ -6,7 +6,12 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getClerkUserId, isClerkAdmin } from "../lib/clerkAdmin";
 
-const CreateArtistBody = z.object({ name: z.string().min(1) });
+const CreateArtistBody = z.object({ name: z.string().min(1).max(200) });
+
+const SaloneArtistValidationSchema = z.object({
+  accepted: z.boolean(),
+  reason: z.string().optional(),
+});
 
 const UpdateArtistBody = z.object({
   name: z.string().min(1).optional(),
@@ -20,6 +25,73 @@ const UpdateArtistBody = z.object({
 });
 
 const router = Router();
+
+/**
+ * Reject obvious non-Salone / spam names before generating a bio (logged-in users can add artists).
+ * Skipped when ANTHROPIC_API_KEY is unset (local dev parity with bio generation fallback).
+ */
+async function validateArtistBelongsInSaloneDirectory(
+  name: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    return { ok: true };
+  }
+
+  const client = new Anthropic({ apiKey: anthropicKey });
+
+  try {
+    const message = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 256,
+      messages: [
+        {
+          role: "user",
+          content: `You gate submissions for "Salone Vibes", a Sierra Leone–focused music app (Salone = Sierra Leone). The directory highlights artists tied to Sierra Leonean music culture: afrobeats, highlife, palm wine, bubu, Krio rap, dancehall from the region, producers and DJs in that scene, and diaspora acts clearly rooted in or representing that wave.
+
+Proposed name to add (exact string):
+"${name.replace(/"/g, '\\"')}"
+
+ACCEPT (accepted: true) if any of these apply:
+- Sierra Leonean artist, DJ, or producer, OR
+- Clearly part of the Sierra Leone / Salone music scene or its diaspora, OR
+- Plausible stage/local name in that scene (OK if uncertain).
+
+REJECT (accepted: false) if:
+- Obvious spam, slurs, gibberish, or not a person/artist name, OR
+- Placeholders: "TBA", "N/A", "test", "asdf", lone "DJ" / "MC", etc., OR
+- A major global act with no meaningful tie to Sierra Leone or Salone music (reject Taylor Swift–type entries with no Salone link).
+
+Beta rule: when genuinely unsure, lean ACCEPT so real scene artists are not blocked; reject only clear outsiders and garbage.
+
+Reply with ONLY valid JSON (boolean true/false, no trailing commentary):
+{"accepted": true, "reason": ""}
+or
+{"accepted": false, "reason": "one short sentence explaining why"}`,
+        },
+      ],
+    });
+
+    const text =
+      message.content[0].type === "text" ? message.content[0].text : "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return { ok: false, reason: "Could not validate this name. Try again." };
+    }
+    const parsed = SaloneArtistValidationSchema.safeParse(JSON.parse(jsonMatch[0]));
+    if (!parsed.success || !parsed.data.accepted) {
+      const reason =
+        parsed.success && parsed.data.reason?.trim()
+          ? parsed.data.reason.trim()
+          : "This doesn’t look like a fit for the Salone artist directory.";
+      return { ok: false, reason };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[artists] Salone validation failed:", err);
+    return { ok: false, reason: "Validation failed. Try again in a moment." };
+  }
+}
 
 async function generateArtistBioAndTags(
   name: string,
@@ -105,9 +177,6 @@ router.post("/artists", async (req, res) => {
   if (!getClerkUserId(req)) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  if (!isClerkAdmin(req)) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
 
   const parseResult = CreateArtistBody.safeParse(req.body);
   if (!parseResult.success) {
@@ -115,6 +184,15 @@ router.post("/artists", async (req, res) => {
   }
 
   const { name } = parseResult.data;
+
+  const validation = await validateArtistBelongsInSaloneDirectory(name);
+  if (!validation.ok) {
+    return res.status(422).json({
+      error: "artist_not_eligible",
+      message: validation.reason,
+    });
+  }
+
   const { bio, vibeTags } = await generateArtistBioAndTags(name);
 
   const [artist] = await db
